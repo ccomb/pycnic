@@ -8,14 +8,46 @@ PRODUCT_ID = 0x0002
 PRODUCT_NAME = u'TinyCN'
 
 def ByteToHex(byteStr):
+    """Converts a byte string to its hex representation
+    
+        >>> from pycnic import ByteToHex
+        >>> ByteToHex('\xFF\xFF')
+        'FF FF'
+        >>> ByteToHex('\xAA\xAA\xAA')
+        'AA AA AA'
+
+    """
     try:
         pretty = u' (%s)' % unicode(byteStr)
     except UnicodeDecodeError:
         pretty = ''
-    return ''.join( [ "%02X " % ord( x ) for x in byteStr ] ).strip() + pretty
+    return ''.join(["%02X " % ord(x) for x in byteStr] ).strip() + pretty
+
 
 def ByteToInt(byteStr):
-    return int(''.join( [ "%02X" % ord( x ) for x in byteStr ]),16)
+    """Converts a byte string to the corresponding integer
+    
+        >>> from pycnic import ByteToInt
+        >>> ByteToInt('\xFF\xFF')
+        65535
+    """
+    return int(''.join(["%02X" % ord(x) for x in byteStr]),16)
+
+
+def IntToByte(integer):
+    """Converts an integer to its corresponding reversed byte string
+
+    >>> from pycnic import IntToByte, ByteToHex
+    >>> print IntToByte(0x00)
+    \x00\x00\x00\x00
+    >>> print IntToByte(0xFF)
+    \xff\x00\x00\x00
+    >>> print IntToByte(0x746F)
+    \x6F\x74\x00\x00
+    >>> print IntToByte(0x746F746F)
+    \x6F\x74\x6F\x74
+    """
+    return ''.join([ chr(integer%(256**i)/256**(i-1)) for i in range(1,5)])
 
 class Motor(object):
     res_x = None # resolution in step/mm
@@ -98,17 +130,17 @@ class TinyCN(object):
             print u'%s bytes written' % bytes
     
     def read(self):
-        if not self.fake:
-            buffer = ctypes.create_string_buffer(64) #FIXME 64 au lieu de bytes
-            print u'Now we read the result...'
-            bytes = usb.bulk_read(self.handle, 0x81, buffer, TIMEOUT)
-            output = buffer.raw[0:bytes]
-            print u'%s bytes read: %s' % (bytes, ByteToHex(output))
-            return output
+        if self.fake: return
+        buffer = ctypes.create_string_buffer(63) #FIXME 64 au lieu de bytes
+        print u'Now we read the result...'
+        bytes = usb.bulk_read(self.handle, 0x81, buffer, TIMEOUT)
+        output = buffer.raw[0:bytes]
+        print u'%s bytes read: %s' % (bytes, ByteToHex(output))
+        return output
 
     def set_prompt(self, state):
         command = '\x18\x03\x08\x00'
-        hex_state = 3*chr(0) + chr(state)
+        hex_state = chr(state) + 3*chr(0)
         self.write(command + hex_state)
 
     def get_prompt(self):
@@ -126,13 +158,13 @@ class TinyCN(object):
     def set_fifo_depth(self, depth):
         print 'set_fifo_depth %s' % depth
         command = '\x18\x10\x08\x00'
-        hex_depth = 3*chr(0) + chr(depth)
+        hex_depth = IntToByte(depth)
         self.write(command + hex_depth)
 
     def set_pulse_width(self, width):
         print 'set_pulse_width %s' % width
         command = '\x13\x08\x08\x00'
-        hex_width = 3*chr(0) + chr(width)
+        hex_width = IntToByte(width)
         self.write(command + hex_width)
 
     def get_speed_calc(self):
@@ -147,11 +179,11 @@ class TinyCN(object):
         if self.tool.denominateur:
             speed = speed * self.motor.res_x \
                 * self.tool.numerateur / self.tool.denominateur
-            print speed
-            hex_speed = hex(int(speed))
+            print 'set calculated speed %s' % speed
+            hex_speed = IntToByte(speed)
             #return speed
         else:
-            hex_speed = 0x01 # FIXME why 1?
+            hex_speed = IntToByte(1)
         #FIXME check that hex_speed is on 4 bytes
         self.write(command + hex_speed)
 
@@ -189,8 +221,8 @@ if __name__ =='__main__':
 
     print 'set the speed'
     #tiny.set_speed(tiny.tool.speed)
-    tiny.write('\x12\x06\x08\x00' + '\x00\x0A\x00\x00')
-    tiny.write('\x14\x11\x08\x00' + '\x00\x00\x00\x10')
+    tiny.write('\x12\x06\x08\x00' + '\x00\x02\x00\x00')
+    tiny.write('\x14\x11\x08\x00' + '\x00\x01\x00\x00') # 100 step!!
 
     tiny.read_name()
 

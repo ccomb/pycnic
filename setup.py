@@ -19,6 +19,7 @@ setup(name='pycnic',
       zip_safe=False,
       install_requires=[
           # -*- Extra requirements: -*-
+          'pylibusb',
       ],
       entry_points="""
       # -*- Entry points: -*-

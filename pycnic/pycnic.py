@@ -14,7 +14,40 @@ def ByteToHex(byteStr):
         pretty = ''
     return ''.join( [ "%02X " % ord( x ) for x in byteStr ] ).strip() + pretty
 
+def ByteToInt(byteStr):
+    return int(''.join( [ "%02X" % ord( x ) for x in byteStr ]),16)
+
+class Motor(object):
+    res_x = None # resolution in step/mm
+    res_y = None
+    res_z = None
+    res_a = None
+    inv_x = None # direction
+    inv_y = None
+    inv_z = None
+    inv_a = None
+    dim_x = None # table dimension
+    dim_y = None
+    dim_z = None
+    dim_a = None
+    micro_step = None
+    current_x = None
+    current_y = None
+    current_z = None
+    current_a = None
+    state = None
+    path_length = None
+
+class Tool(object):
+    numerateur = None
+    denominateur = None
+    speed = None
+
 class TinyCN(object):
+    
+    motor = None
+    tool = None
+    
     def __init__(self):
         usb.init()
         if not usb.get_busses():
@@ -34,23 +67,25 @@ class TinyCN(object):
                     break
     
         if dev is None:
-            print u'No device found'
-            return None
+            raise IOError(u'No device found')
         self.handle = usb.open(dev)
         ###
-        interface_nr = 0
-        if hasattr(usb,'get_driver_np'):
-            # non-portable libusb extension
-            name = usb.get_driver_np(self.handle,interface_nr)
-            if name != '':
-                print 'detach %s' % name
-                usb.detach_kernel_driver_np(self.handle,interface_nr)
-        
-        config = dev.config[0]
-        usb.set_configuration(self.handle, config.bConfigurationValue)
-        
-        usb.claim_interface(self.handle, interface_nr)
+        #interface_nr = 0
+        #if hasattr(usb,'get_driver_np'):
+        #    # non-portable libusb extension
+        #    name = usb.get_driver_np(self.handle,interface_nr)
+        #    if name != '':
+        #        print 'detach %s' % name
+        #        usb.detach_kernel_driver_np(self.handle,interface_nr)
+        #
+        #config = dev.config[0]
+        #usb.set_configuration(self.handle, config.bConfigurationValue)
+        #
+        #usb.claim_interface(self.handle, interface_nr)
 
+        self.motor = Motor()
+        self.tool = Tool()
+        
     def write(self, command):    
         buffer = ctypes.create_string_buffer(len(command))
         buffer.value = command
@@ -62,28 +97,54 @@ class TinyCN(object):
         buffer = ctypes.create_string_buffer(64) #FIXME 64 au lieu de bytes
         print u'Now we read the result...'
         bytes = usb.bulk_read(self.handle, 0x81, buffer, TIMEOUT)
-        print u'%s bytes read: %s' % (bytes, ByteToHex(buffer.raw[0:bytes]))
+        output = buffer.raw[0:bytes]
+        print u'%s bytes read: %s' % (bytes, ByteToHex(output))
+        return output
 
     def set_prompt(self, state):
         command = '\x18\x03\x08\x00'
-        if state:
-            hexstate = '\x00\x00\x00\x01'
-        else:
-            hexstate = '\x00\x00\x00\x00'
-        self.write(command + hexstate)
+        hex_state = 3*chr(0) + chr(state)
+        self.write(command + hex_state)
 
     def get_prompt(self):
         self.write('\x18\x83\x04\x00')
         self.read()
 
     def read_name(self):
-        #self.write('\x00\x04\x85\x18')
         self.write('\x18\x85\x04\x00')
         self.read()
 
     def get_serial(self):
         self.write('\x18\x84\x04\x00')
         self.read()
+
+    def set_fifo_depth(self, depth):
+        hex_depth = 3*chr(0) + chr(depth)
+        self.write('\x18\x10\x08\x00' + hex_depth)
+
+    def set_pulse_width(self, width):
+        hex_width = 3*chr(0) + chr(width)
+        self.write('\x13\x08\x08\x00' + hex_width)
+
+    def get_speed_calc(self):
+        self.write('\x12\x89\x04\x00')
+        return self.read()
+
+    def set_speed(self, speed):
+        speed = speed / 60 # FIXME not exact!
+        if self.tool.denominateur:
+            speed = speed * self.motor.res_x \
+                * self.tool.numerateur / self.tool.denominateur
+            print hex(int(speed))
+            return speed
+        else:
+            hex_speed = 0x01 # FIXME why 1?
+        #FIXME check that hex_speed is on 4 bytes
+        self.write('\x12\x06\x08\x00' + '\x00\x00\x00\x05')
+
+    def move_ramp_xyz(self, x, y, z):
+        raise NotImplementedError
+
 if __name__ =='__main__':
     
     #P1 : in 0x81, out 0x01
@@ -93,10 +154,34 @@ if __name__ =='__main__':
     if tiny is None:
         sys.exit()
 
-    tiny.set_prompt(0)
-    tiny.get_prompt()
-    tiny.get_serial()
+    #tiny.set_prompt(0)
+    #tiny.get_prompt()
+    #tiny.get_serial()
     tiny.read_name()
+
+    tiny.motor.res_x = 200
+    tiny.motor.res_y = 200
+    tiny.motor.res_z = 200
+
+    #tiny.set_fifo_depth(255) # 255 pulses
+    #tiny.set_pulse_width(64)
+    #res = tiny.get_speed_calc()
+
+    #tiny.tool.numerateur = ByteToInt(res[0:4])
+    #tiny.tool.denominateur = ByteToInt(res[4:8])
+    #print 'numerateur = %s' % tiny.tool.numerateur
+    #print 'denominateur = %s' % tiny.tool.denominateur
+    #tiny.tool.speed = 2000
+
+    #tiny.set_speed(2000)
+    tiny.write('\x12\x06\x08\x00' + '\x00\x06\x00\x00')
+    tiny.write('\x14\x11\x08\x00' + '\x00\x00\x00\x10')
+
+    tiny.read_name()
+
+    #tiny.write('\x14\x08\x10\x00' + 3*'\x00\x00\x01\x10')
+
+
 
 
 

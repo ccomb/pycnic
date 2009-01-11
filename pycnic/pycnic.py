@@ -1,6 +1,7 @@
 import sys
 import pylibusb as usb
 import ctypes
+import time
 
 TIMEOUT = 500 # timeout for usb read or write
 VENDOR_ID = 0x9999
@@ -40,6 +41,8 @@ def IntToByte(integer):
     >>> from pycnic import IntToByte, ByteToHex
     >>> print IntToByte(0x00)
     \x00\x00\x00\x00
+    >>> print IntToByte(0x01)
+    \x01\x00\x00\x00
     >>> print IntToByte(0xFF)
     \xff\x00\x00\x00
     >>> print IntToByte(0x746F)
@@ -47,6 +50,7 @@ def IntToByte(integer):
     >>> print IntToByte(0x746F746F)
     \x6F\x74\x6F\x74
     """
+    #not reversed : return ''.join([ chr(integer%(256**i)/256**(i-1)) for i in range(4,0,-1)])
     return ''.join([ chr(integer%(256**i)/256**(i-1)) for i in range(1,5)])
 
 class Motor(object):
@@ -175,20 +179,14 @@ class TinyCN(object):
         print 'set speed %s' % speed
         command = '\x12\x06\x08\x00'
 
-        speed = speed / 60 # FIXME not exact!
-        if self.tool.denominateur:
-            speed = speed * self.motor.res_x \
-                * self.tool.numerateur / self.tool.denominateur
-            print 'set calculated speed %s' % speed
-            hex_speed = IntToByte(speed)
-            #return speed
-        else:
-            hex_speed = IntToByte(1)
-        #FIXME check that hex_speed is on 4 bytes
-        self.write(command + hex_speed)
+        #speed = speed / 60 # FIXME not exact!
+        self.write(command + IntToByte(speed))
 
     def move_ramp_xyz(self, x, y, z):
         raise NotImplementedError
+
+    def move_const_x(self, steps):
+        tiny.write('\x14\x11\x08\x00' + IntToByte(steps))
 
 if __name__ =='__main__':
     
@@ -217,12 +215,16 @@ if __name__ =='__main__':
     tiny.tool.denominateur = ByteToInt(res[4:8])
     print 'numerateur = %s' % tiny.tool.numerateur
     print 'denominateur = %s' % tiny.tool.denominateur
-    tiny.tool.speed = 1200
 
     print 'set the speed'
-    #tiny.set_speed(tiny.tool.speed)
-    tiny.write('\x12\x06\x08\x00' + '\x00\x02\x00\x00')
-    tiny.write('\x14\x11\x08\x00' + '\x00\x01\x00\x00') # 100 step!!
+    tiny.tool.speed = 0xFFFFFFFF
+    tiny.set_speed(tiny.tool.speed)
+    tiny.move_const_x(10) # 10 step!
+    time.sleep(0.2)
+    tiny.move_const_x(10) # 10 step!
+    time.sleep(0.2)
+    tiny.move_const_x(10) # 10 step!
+    time.sleep(0.2)
 
     tiny.read_name()
 

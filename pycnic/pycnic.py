@@ -3,11 +3,18 @@ import sys
 import pylibusb as usb
 import ctypes
 import time
+from optparse import OptionParser
 
 TIMEOUT = 500 # timeout for usb read or write
 VENDOR_ID = 0x9999
 PRODUCT_ID = 0x0002
 PRODUCT_NAME = u'TinyCN'
+
+DEBUG=False
+
+def debug(message):
+    if DEBUG:
+        print message
 
 def ByteToHex(byteStr):
     """Converts a byte string to its hex representation
@@ -19,12 +26,11 @@ def ByteToHex(byteStr):
         'AA AA AA'
 
     """
-    #assert(len(byteStr) <= 4)
     try:
         pretty = u' (%s)' % unicode(byteStr)
     except UnicodeDecodeError:
         pretty = ''
-    return ''.join(["%02X " % ord(x) for x in byteStr] ).strip() + pretty
+    return ''.join(["%02X " % ord(x) for x in byteStr] ).strip() #+ pretty
 
 
 def ByteToInt(byteStr):
@@ -93,7 +99,6 @@ class TinyCN(object):
     def __init__(self, fake=False):
         self.fake = fake
         if not self.fake:
-            usb.set_debug(True)
             usb.init()
             if not usb.get_busses():
                 usb.find_busses()
@@ -107,7 +112,7 @@ class TinyCN(object):
                 for device in bus.devices:
                     if device.descriptor.idVendor == VENDOR_ID \
                       and device.descriptor.idProduct == PRODUCT_ID:
-                        print u"found %s!" % PRODUCT_NAME
+                        debug(u"found %s!" % PRODUCT_NAME)
                         dev = device
                         break
     
@@ -116,19 +121,19 @@ class TinyCN(object):
             self.handle = usb.open(dev)
             #usb.reset(self.handle)
         ##
-        interface_nr = 0
-        if hasattr(usb,'get_driver_np'):
-            # non-portable libusb extension
-            name = usb.get_driver_np(self.handle,interface_nr)
-            #print 'Got driver name = %s' % name
-            if name != '':
-                #print 'Detach %s' % name
-                usb.detach_kernel_driver_np(self.handle,interface_nr)
-        
-        config = dev.config[0]
-        usb.set_configuration(self.handle, config.bConfigurationValue)
-        #print 'setting configuration %s' % config.bConfigurationValue
-        usb.claim_interface(self.handle, interface_nr)
+        #interface_nr = 0
+        #if hasattr(usb,'get_driver_np'):
+        #    # non-portable libusb extension
+        #    name = usb.get_driver_np(self.handle,interface_nr)
+        #    debug('Got driver name = %s' % name)
+        #    if name != '':
+        #        debug('Detach %s' % name)
+        #        usb.detach_kernel_driver_np(self.handle,interface_nr)
+        #
+        #config = dev.config[0]
+        #usb.set_configuration(self.handle, config.bConfigurationValue)
+        #debug('setting configuration %s' % config.bConfigurationValue)
+        #usb.claim_interface(self.handle, interface_nr)
 
         self.motor = Motor()
         self.tool = Tool()
@@ -140,31 +145,31 @@ class TinyCN(object):
     def write(self, command, alt=0):
         buffer = ctypes.create_string_buffer(len(command))
         buffer.value = command
-        print u'    we write the command %s...' % ByteToHex(buffer.raw)
+        debug(u'    we write the command %s...' % ByteToHex(buffer.raw))
         if not self.fake:
             bytes = usb.bulk_write(self.handle, 0x01+alt, buffer, TIMEOUT)
-            print u'    %s bytes written' % bytes
+            debug(u'    %s bytes written' % bytes)
     
     def read(self, alt=0):
         if self.fake: return
         buffer = ctypes.create_string_buffer(63) #FIXME 64 au lieu de bytes
-        print u'    Now we read the result...'
+        debug(u'    Now we read the result...')
         bytes = usb.bulk_read(self.handle, 0x81 + alt, buffer, TIMEOUT)
         output = buffer.raw[0:bytes]
-        print u'    %s bytes read: %s' % (bytes, ByteToHex(output))
+        debug(u'    %s bytes read: %s' % (bytes, ByteToHex(output)))
         return output
 
     def set_prompt(self, state):
-        print 'Setting prompt %s' % state
+        debug('Setting prompt %s' % state)
         command = '\x18\x03\x08\x00'
         hex_state = chr(state) + 3*chr(0)
         self.write(command + hex_state)
 
     def get_prompt(self):
-        print 'Reading prompt'
+        debug('Reading prompt')
         self.write('\x18\x83\x04\x00')
         prompt = self.read()
-        print '  Got prompt: %s' % prompt
+        debug('  Got prompt: %s' % prompt)
         return prompt
 
     def read_name(self):
@@ -176,31 +181,31 @@ class TinyCN(object):
         return self.read()
 
     def set_fifo_depth(self, depth):
-        print 'Setting fifo pulse generator to %s pulses' % depth
+        debug('Setting fifo pulse generator to %s pulses' % depth)
         command = '\x18\x10\x08\x00'
         hex_depth = IntToByte(depth)
         self.write(command + hex_depth)
 
     def set_pulse_width(self, width):
-        print 'Setting pulse width to %s ' % width
+        debug('Setting pulse width to %s ' % width)
         command = '\x13\x08\x08\x00'
         hex_width = IntToByte(width)
         self.write(command + hex_width)
 
     def get_speed_calc(self):
-        print 'Reading speed calc'
+        debug('Reading speed calc')
         self.write('\x12\x89\x04\x00')
         speed_calc = self.read()
-        print '  Got speed calc = %s' % ByteToHex(speed_calc)
+        debug('  Got speed calc = %s' % ByteToHex(speed_calc))
         return speed_calc
 
     def set_speed(self, speed, resolution):
-        print 'Setting speed to %s mm/min' % speed
+        debug('Setting speed to %s mm/min' % speed)
         command = '\x12\x06\x08\x00'
         speed = speed / 60.0 # convert to mm/s
         speed = speed * resolution * self.tool.numerateur / self.tool.denominateur # FIXME check
         hexspeed = IntToByte(int(speed))
-        print '  hex speed = %s' % ByteToHex(hexspeed)
+        debug('  hex speed = %s' % ByteToHex(hexspeed))
         self.write(command + hexspeed)
 
     def move_ramp_xyz(self, x, y, z):
@@ -209,22 +214,33 @@ class TinyCN(object):
     def move_const_x(self, steps):
         """Move the motor to a fixed position
         """
-        print 'move x to step %s' % steps
+        debug('move x to step %s' % steps)
         tiny.write('\x14\x11\x08\x00' + IntToByte(steps))
 
     def get_buffer_state(self):
+        debug('get_buffer_state')
         self.write('\x80\x18')
         state = self.read(1)
-        print ByteToHex(state)
+        debug(ByteToHex(state))
         return state
 
     def get_fifo_count(self):
+        debug('get_fifo_count')
         self.write('\x80\x10')
         state = self.read(1)
-        print ByteToHex(state)
+        debug(len(state))
+        debug(ByteToHex(state))
         return ByteToInt(state)
 
 if __name__ =='__main__':
+    parser = OptionParser()
+    parser.add_option('-d', '--debug', nargs=0, help='set debug mode')
+    (options, args) = parser.parse_args()
+    if parser.has_option('-d'):
+        global DEBUG
+        DEBUG=True
+        #usb.set_debug(True)
+
     
     #P1 : in 0x81, out 0x01
     #P2 : in 0x82, out 0x02
@@ -242,12 +258,12 @@ if __name__ =='__main__':
     tiny.set_fifo_depth(255) # 255 pulses
     tiny.set_pulse_width(64) # 5µs (?)
     res = tiny.get_speed_calc()
-    print ByteToHex(res)
+    debug(ByteToHex(res))
 
     tiny.tool.numerateur = ByteToInt(res[4:8])
     tiny.tool.denominateur = ByteToInt(res[0:4])
-    print 'numerateur = %s' % tiny.tool.numerateur
-    print 'denominateur = %s' % tiny.tool.denominateur
+    debug('numerateur = %s' % tiny.tool.numerateur)
+    debug('denominateur = %s' % tiny.tool.denominateur)
 
     tiny.set_speed(1000, tiny.motor.res_x)
     tiny.move_const_x(0)
@@ -261,12 +277,11 @@ if __name__ =='__main__':
         x+=10
 
     #ramp tiny.write('\x14\x08\x10\x00' + 3*'\x00\x00\x01\x10')
-    tiny.read_name()
-
-    while tiny.get_buffer_state() != '\x00\x80':
-        time.sleep(0.1)
-    while tiny.get_fifo_count() > 0:
-        time.sleep(0.1)
+    print ByteToHex(tiny.get_buffer_state())
+    #while tiny.get_buffer_state() != '\x00\x80':
+    #    pass
+    #while tiny.get_fifo_count() > 0:
+    #    time.sleep(0.1)
 
 #    usb.release_interface(tiny.handle, 0)
 #    usb.detach_kernel_driver_np(tiny.handle,0)

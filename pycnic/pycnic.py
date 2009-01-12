@@ -1,3 +1,4 @@
+# coding: utf-8
 import sys
 import pylibusb as usb
 import ctypes
@@ -18,6 +19,7 @@ def ByteToHex(byteStr):
         'AA AA AA'
 
     """
+    #assert(len(byteStr) <= 4)
     try:
         pretty = u' (%s)' % unicode(byteStr)
     except UnicodeDecodeError:
@@ -26,17 +28,20 @@ def ByteToHex(byteStr):
 
 
 def ByteToInt(byteStr):
-    """Converts a byte string to the corresponding integer
+    """Converts a little endian (ie reversed) byte string to the corresponding integer
     
         >>> from pycnic import ByteToInt
         >>> ByteToInt('\xFF\xFF')
         65535
+        >>> ByteToInt('\x40\x01')
+        320
     """
-    return int(''.join(["%02X" % ord(x) for x in byteStr]),16)
+    assert(len(byteStr) <= 4)
+    return int(''.join(["%02X" % ord(x) for x in reversed(byteStr)]),16)
 
 
 def IntToByte(integer):
-    """Converts an integer to its corresponding reversed byte string
+    """Converts an integer to its corresponding little endian (ie reversed) byte string
 
     >>> from pycnic import IntToByte, ByteToHex
     >>> print IntToByte(0x00)
@@ -125,31 +130,35 @@ class TinyCN(object):
         self.motor = Motor()
         self.tool = Tool()
 
-    def write(self, command):
+    def write(self, command, alt=0):
         buffer = ctypes.create_string_buffer(len(command))
         buffer.value = command
-        print u'we write the command %s...' % ByteToHex(buffer.raw)
+        print u'    we write the command %s...' % ByteToHex(buffer.raw)
         if not self.fake:
-            bytes = usb.bulk_write(self.handle, 0x01, buffer, TIMEOUT)
-            print u'%s bytes written' % bytes
+            bytes = usb.bulk_write(self.handle, 0x01+alt, buffer, TIMEOUT)
+            print u'    %s bytes written' % bytes
     
-    def read(self):
+    def read(self, alt=0):
         if self.fake: return
         buffer = ctypes.create_string_buffer(63) #FIXME 64 au lieu de bytes
-        print u'Now we read the result...'
-        bytes = usb.bulk_read(self.handle, 0x81, buffer, TIMEOUT)
+        print u'    Now we read the result...'
+        bytes = usb.bulk_read(self.handle, 0x81 + alt, buffer, TIMEOUT)
         output = buffer.raw[0:bytes]
-        print u'%s bytes read: %s' % (bytes, ByteToHex(output))
+        print u'    %s bytes read: %s' % (bytes, ByteToHex(output))
         return output
 
     def set_prompt(self, state):
+        print 'Setting prompt %s' % state
         command = '\x18\x03\x08\x00'
         hex_state = chr(state) + 3*chr(0)
         self.write(command + hex_state)
 
     def get_prompt(self):
+        print 'Reading prompt'
         self.write('\x18\x83\x04\x00')
-        self.read()
+        prompt = self.read()
+        print '  Got prompt: %s' % prompt
+        return prompt
 
     def read_name(self):
         self.write('\x18\x85\x04\x00')
@@ -157,36 +166,50 @@ class TinyCN(object):
 
     def get_serial(self):
         self.write('\x18\x84\x04\x00')
-        self.read()
+        return self.read()
 
     def set_fifo_depth(self, depth):
-        print 'set_fifo_depth %s' % depth
+        print 'Setting fifo pulse generator to %s pulses' % depth
         command = '\x18\x10\x08\x00'
         hex_depth = IntToByte(depth)
         self.write(command + hex_depth)
 
     def set_pulse_width(self, width):
-        print 'set_pulse_width %s' % width
+        print 'Setting pulse width to %s ' % width
         command = '\x13\x08\x08\x00'
         hex_width = IntToByte(width)
         self.write(command + hex_width)
 
     def get_speed_calc(self):
+        print 'Reading speed calc'
         self.write('\x12\x89\x04\x00')
-        return self.read()
+        speed_calc = self.read()
+        print '  Got speed calc = %s' % ByteToHex(speed_calc)
+        return speed_calc
 
-    def set_speed(self, speed):
-        print 'set speed %s' % speed
+    def set_speed(self, speed, resolution):
+        print 'Setting speed to %s mm/min' % speed
         command = '\x12\x06\x08\x00'
-
-        #speed = speed / 60 # FIXME not exact!
-        self.write(command + IntToByte(speed))
+        speed = speed / 60.0 # convert to mm/s
+        speed = speed * resolution * self.tool.numerateur / self.tool.denominateur # FIXME check
+        hexspeed = IntToByte(int(speed))
+        print '  hex speed = %s' % ByteToHex(hexspeed)
+        self.write(command + hexspeed)
 
     def move_ramp_xyz(self, x, y, z):
         raise NotImplementedError
 
     def move_const_x(self, steps):
+        """Move the motor to a fixed position
+        """
+        print 'move x to step %s' % steps
         tiny.write('\x14\x11\x08\x00' + IntToByte(steps))
+
+    def get_buffer_state(self):
+        self.write('\x80\x18')
+        state = self.read(1)
+        print ByteToHex(state)
+        return state
 
 if __name__ =='__main__':
     
@@ -197,36 +220,40 @@ if __name__ =='__main__':
     if tiny is None:
         sys.exit()
 
-    #tiny.set_prompt(0)
-    #tiny.get_prompt()
-    #tiny.get_serial()
-    tiny.read_name()
-
     tiny.motor.res_x = 200
     tiny.motor.res_y = 200
     tiny.motor.res_z = 200
 
-
-    tiny.set_fifo_depth(15) # 255 pulses
-    tiny.set_pulse_width(64)
+    tiny.set_prompt(0)
+    tiny.read_name()
+    tiny.set_fifo_depth(255) # 255 pulses
+    tiny.set_pulse_width(64) # 5µs (?)
     res = tiny.get_speed_calc()
+    print ByteToHex(res)
 
-    tiny.tool.numerateur = ByteToInt(res[0:4])
-    tiny.tool.denominateur = ByteToInt(res[4:8])
+    tiny.tool.numerateur = ByteToInt(res[4:8])
+    tiny.tool.denominateur = ByteToInt(res[0:4])
     print 'numerateur = %s' % tiny.tool.numerateur
     print 'denominateur = %s' % tiny.tool.denominateur
 
-    print 'set the speed'
-    tiny.tool.speed = 0xFFFFFFFF
-    tiny.set_speed(tiny.tool.speed)
-    tiny.move_const_x(10) # 10 step!
-    time.sleep(0.2)
-    tiny.move_const_x(10) # 10 step!
-    time.sleep(0.2)
-    tiny.move_const_x(10) # 10 step!
-    time.sleep(0.2)
+    tiny.tool.speed = 150
+    x=0
+    for tiny.tool.speed in range(0, 20):
+        tiny.set_speed(tiny.tool.speed, tiny.motor.res_x)
+        tiny.move_const_x(x)
+        #time.sleep(0.01)
+        x+=10
 
     tiny.read_name()
+
+    tiny.get_buffer_state()
+    tiny.get_buffer_state()
+    tiny.get_buffer_state()
+    tiny.get_buffer_state()
+    tiny.get_buffer_state()
+
+    while tiny.get_buffer_state() == '\x00\x80':
+        time.sleep(0.5)
 
     #tiny.write('\x14\x08\x10\x00' + 3*'\x00\x00\x01\x10')
 

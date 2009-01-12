@@ -93,6 +93,7 @@ class TinyCN(object):
     def __init__(self, fake=False):
         self.fake = fake
         if not self.fake:
+            usb.set_debug(True)
             usb.init()
             if not usb.get_busses():
                 usb.find_busses()
@@ -113,22 +114,28 @@ class TinyCN(object):
             if dev is None:
                 raise IOError(u'No device found')
             self.handle = usb.open(dev)
-        ###
-        #interface_nr = 0
-        #if hasattr(usb,'get_driver_np'):
-        #    # non-portable libusb extension
-        #    name = usb.get_driver_np(self.handle,interface_nr)
-        #    if name != '':
-        #        print 'detach %s' % name
-        #        usb.detach_kernel_driver_np(self.handle,interface_nr)
-        #
-        #config = dev.config[0]
-        #usb.set_configuration(self.handle, config.bConfigurationValue)
-        #
-        #usb.claim_interface(self.handle, interface_nr)
+            #usb.reset(self.handle)
+        ##
+        interface_nr = 0
+        if hasattr(usb,'get_driver_np'):
+            # non-portable libusb extension
+            name = usb.get_driver_np(self.handle,interface_nr)
+            #print 'Got driver name = %s' % name
+            if name != '':
+                #print 'Detach %s' % name
+                usb.detach_kernel_driver_np(self.handle,interface_nr)
+        
+        config = dev.config[0]
+        usb.set_configuration(self.handle, config.bConfigurationValue)
+        #print 'setting configuration %s' % config.bConfigurationValue
+        usb.claim_interface(self.handle, interface_nr)
 
         self.motor = Motor()
         self.tool = Tool()
+
+    def __XXXdel__(self):
+        usb.release_interface(self.handle, 0) # XXX
+        usb.close(self.handle)
 
     def write(self, command, alt=0):
         buffer = ctypes.create_string_buffer(len(command))
@@ -211,6 +218,12 @@ class TinyCN(object):
         print ByteToHex(state)
         return state
 
+    def get_fifo_count(self):
+        self.write('\x80\x10')
+        state = self.read(1)
+        print ByteToHex(state)
+        return ByteToInt(state)
+
 if __name__ =='__main__':
     
     #P1 : in 0x81, out 0x01
@@ -236,27 +249,30 @@ if __name__ =='__main__':
     print 'numerateur = %s' % tiny.tool.numerateur
     print 'denominateur = %s' % tiny.tool.denominateur
 
+    tiny.set_speed(1000, tiny.motor.res_x)
+    tiny.move_const_x(0)
+
     tiny.tool.speed = 150
     x=0
-    for tiny.tool.speed in range(0, 20):
+    for tiny.tool.speed in range(0, 250):
         tiny.set_speed(tiny.tool.speed, tiny.motor.res_x)
         tiny.move_const_x(x)
         #time.sleep(0.01)
         x+=10
 
+    #ramp tiny.write('\x14\x08\x10\x00' + 3*'\x00\x00\x01\x10')
     tiny.read_name()
 
-    tiny.get_buffer_state()
-    tiny.get_buffer_state()
-    tiny.get_buffer_state()
-    tiny.get_buffer_state()
-    tiny.get_buffer_state()
+    while tiny.get_buffer_state() != '\x00\x80':
+        time.sleep(0.1)
+    while tiny.get_fifo_count() > 0:
+        time.sleep(0.1)
 
-    while tiny.get_buffer_state() == '\x00\x80':
-        time.sleep(0.5)
-
-    #tiny.write('\x14\x08\x10\x00' + 3*'\x00\x00\x01\x10')
-
+#    usb.release_interface(tiny.handle, 0)
+#    usb.detach_kernel_driver_np(tiny.handle,0)
+#    usb.reset(tiny.handle)
+#    usb.close(tiny.handle)
+    #del tiny
 
 
 

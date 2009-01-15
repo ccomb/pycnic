@@ -277,7 +277,7 @@ if __name__ =='__main__':
         x+=10
 
     #ramp tiny.write('\x14\x08\x10\x00' + 3*'\x00\x00\x01\x10')
-    print ByteToHex(tiny.get_buffer_state())
+    #tiny.get_buffer_state()
     #while tiny.get_buffer_state() != '\x00\x80':
     #    pass
     #while tiny.get_fifo_count() > 0:

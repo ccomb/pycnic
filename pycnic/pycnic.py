@@ -10,6 +10,7 @@ VENDOR_ID = 0x9999
 PRODUCT_ID = 0x0002
 PRODUCT_NAME = u'TinyCN'
 
+global DEBUG
 DEBUG=False
 
 def debug(message):
@@ -236,10 +237,9 @@ if __name__ =='__main__':
     parser = OptionParser()
     parser.add_option('-d', '--debug', nargs=0, help='set debug mode')
     (options, args) = parser.parse_args()
-    if parser.has_option('-d'):
-        global DEBUG
+    if options.debug is not None:
         DEBUG=True
-        #usb.set_debug(True)
+        usb.set_debug(True)
 
     
     #P1 : in 0x81, out 0x01
@@ -270,7 +270,7 @@ if __name__ =='__main__':
 
     tiny.tool.speed = 150
     x=0
-    for tiny.tool.speed in range(0, 250):
+    for tiny.tool.speed in range(0, 25):
         tiny.set_speed(tiny.tool.speed, tiny.motor.res_x)
         tiny.move_const_x(x)
         #time.sleep(0.01)

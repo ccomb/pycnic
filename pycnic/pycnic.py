@@ -1,4 +1,5 @@
 # coding: utf-8
+# 1, 2, 3, 4 : noir, vert, rouge, bleu
 import sys
 import pylibusb as usb
 import ctypes
@@ -209,14 +210,57 @@ class TinyCN(object):
         debug('  hex speed = %s' % ByteToHex(hexspeed))
         self.write(command + hexspeed)
 
+    def set_speed_acca(self, acc):
+        debug('Setting acca to %s mm/min' % acc)
+        command = '\x12\x01\x08\x00'
+        hexacc = IntToByte(int(acc))
+        debug('  hex acc = %s' % ByteToHex(hexacc))
+        self.write(command + hexacc)
+
     def move_ramp_xyz(self, x, y, z):
         raise NotImplementedError
+
+    def move_ramp_x(self, steps):
+        """move to x using ramp
+        """
+        debug('move x to step %s' % steps)
+        tiny.write('\x14\x11\x01\x00' + IntToByte(steps))
+
+    def move_var_x(self, steps, start, stop, direction):
+        """move to x using ramp
+        """
+        if direction == 'up':
+            cmd = '\x14\xA1\x10\x00'
+        elif direction == 'down':
+            cmd = '\x14\x21\x10\x00'
+        else:
+            raise Exception(u'Wrong direction')
+        debug('move var x to step %s' % steps)
+        tiny.write(cmd + IntToByte(steps) + IntToByte(start) + IntToByte(stop))
 
     def move_const_x(self, steps):
         """Move the motor to a fixed position
         """
         debug('move x to step %s' % steps)
         tiny.write('\x14\x11\x08\x00' + IntToByte(steps))
+
+    def move_const_y(self, steps):
+        """Move the motor to a fixed position
+        """
+        debug('move y to step %s' % steps)
+        tiny.write('\x14\x12\x08\x00' + IntToByte(steps))
+
+    def move_const_z(self, steps):
+        """Move the motor to a fixed position
+        """
+        debug('move z to step %s' % steps)
+        tiny.write('\x14\x13\x08\x00' + IntToByte(steps))
+
+    def move_const_a(self, steps):
+        """Move the motor to a fixed position
+        """
+        debug('move a to step %s' % steps)
+        tiny.write('\x14\x14\x08\x00' + IntToByte(steps))
 
     def get_buffer_state(self):
         debug('get_buffer_state')
@@ -265,16 +309,83 @@ if __name__ =='__main__':
     debug('numerateur = %s' % tiny.tool.numerateur)
     debug('denominateur = %s' % tiny.tool.denominateur)
 
-    tiny.set_speed(1000, tiny.motor.res_x)
-    tiny.move_const_x(0)
 
-    tiny.tool.speed = 150
+    tiny.tool.speed = 500
     x=0
-    for tiny.tool.speed in range(0, 25):
-        tiny.set_speed(tiny.tool.speed, tiny.motor.res_x)
-        tiny.move_const_x(x)
-        #time.sleep(0.01)
-        x+=10
+    #for tiny.tool.speed in range(0, 950):
+    #    tiny.set_speed(tiny.tool.speed, tiny.motor.res_x)
+    #    tiny.move_const_x(x)
+    #    #time.sleep(0.01)
+    #    x+=5
+
+    tiny.set_speed(tiny.tool.speed, tiny.motor.res_x)
+
+
+    ### A/R
+
+    ### music
+    i = 0
+    freqs = [ int(440*(2**(1.0/12))**i) for i in range(12) ]
+    freqs = [ 440, 493, 554, 587, 659, 739, 830 ]
+    notes = [ 'C', 'D', 'E', 'F', 'G', 'A', 'B' ]
+    notfreqs = dict(zip(notes, freqs))
+
+    def f(note):
+        return notfreqs[note]
+
+    tiny.set_speed(f('C'), tiny.motor.res_x)
+    i += 1000
+    tiny.move_const_x(i)
+
+    tiny.set_speed(f('D'), tiny.motor.res_x)
+    i += 1000
+    tiny.move_const_x(i)
+
+    tiny.set_speed(f('E'), tiny.motor.res_x)
+    i += 1000
+    tiny.move_const_x(i)
+
+    tiny.set_speed(f('F'), tiny.motor.res_x)
+    i += 1000
+    tiny.move_const_x(i)
+
+    tiny.set_speed(f('G'), tiny.motor.res_x)
+    i += 1000
+    tiny.move_const_x(i)
+
+    tiny.set_speed(f('F'), tiny.motor.res_x)
+    i += 1000
+    tiny.move_const_x(i)
+
+    tiny.set_speed(f('E'), tiny.motor.res_x)
+    i += 1000
+    tiny.move_const_x(i)
+
+    tiny.set_speed(f('D'), tiny.motor.res_x)
+    i += 1000
+    tiny.move_const_x(i)
+
+    tiny.set_speed(f('C'), tiny.motor.res_x)
+    i += 1000
+    tiny.move_const_x(i)
+    import time; time.sleep(2)
+    tiny.move_var_x(0, 0, 400, 'up')
+    sys.exit()
+
+    tiny.set_speed_acca(2)
+    # accelerate to step 500, with speed growing from 0 to 400
+    tiny.move_var_x(8400, 0, 1000, 'up')
+    tiny.move_var_x(9000, 1000, 0, 'down')
+
+    tiny.move_var_x(600, 0, 1000, 'up')
+    tiny.move_var_x(0, 1000, 0, 'down')
+
+
+    tiny.move_ramp_x(2000)
+    tiny.move_var_x(3000, 500, 0, 'down')
+    tiny.move_var_x(2500, 0, 500, 'up')
+    tiny.move_ramp_x(500)
+    tiny.move_var_x(0, 500, 0, 'down')
 
     #ramp tiny.write('\x14\x08\x10\x00' + 3*'\x00\x00\x01\x10')
     #tiny.get_buffer_state()

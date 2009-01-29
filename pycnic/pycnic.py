@@ -217,6 +217,13 @@ class TinyCN(object):
         debug('  hex acc = %s' % ByteToHex(hexacc))
         self.write(command + hexacc)
 
+    def set_speed_accb(self, acc):
+        debug('Setting accb to %s mm/min' % acc)
+        command = '\x12\x02\x08\x00'
+        hexacc = IntToByte(int(acc))
+        debug('  hex acc = %s' % ByteToHex(hexacc))
+        self.write(command + hexacc)
+
     def move_ramp_xyz(self, x, y, z):
         raise NotImplementedError
 
@@ -293,7 +300,7 @@ if __name__ =='__main__':
     if tiny is None:
         sys.exit()
 
-    tiny.motor.res_x = 200
+    tiny.motor.res_x = 30
     tiny.motor.res_y = 200
     tiny.motor.res_z = 200
 
@@ -310,7 +317,7 @@ if __name__ =='__main__':
     debug('denominateur = %s' % tiny.tool.denominateur)
 
 
-    tiny.tool.speed = 500
+    tiny.tool.speed = 700
     x=0
     #for tiny.tool.speed in range(0, 950):
     #    tiny.set_speed(tiny.tool.speed, tiny.motor.res_x)
@@ -321,64 +328,106 @@ if __name__ =='__main__':
     tiny.set_speed(tiny.tool.speed, tiny.motor.res_x)
 
 
-    ### A/R
 
     ### music
-    i = 0
-    freqs = [ int(440*(2**(1.0/12))**i) for i in range(12) ]
-    freqs = [ 440, 493, 554, 587, 659, 739, 830 ]
-    notes = [ 'C', 'D', 'E', 'F', 'G', 'A', 'B' ]
+    freqs = [ int(220*(2**(1.0/12))**i) for i in range(44) ]
+    notes = [
+             'A',  'A#',  'B',  'C',  'C#',  'D',  'D#',  'E',  'F',  'F#',  'G',  'G#',
+             'A2', 'A2#', 'B2', 'C2', 'C2#', 'D2', 'D2#', 'E2', 'F2', 'F2#', 'G2', 'G2#',
+             'A3', 'A3#', 'B3', 'C3', 'C3#', 'D3', 'D3#', 'E3', 'F3', 'F3#', 'G3', 'G3#',
+             'A4', 'A4#', 'B4', 'C4', 'C4#', 'D4', 'D4#', 'E4', 'F4', 'F4#', 'G4', 'G4#',
+            ]
     notfreqs = dict(zip(notes, freqs))
 
-    def f(note):
-        return notfreqs[note]
+    current_position = 0
+    way = 1 # forward = 1, backward = -1
 
-    tiny.set_speed(f('C'), tiny.motor.res_x)
-    i += 1000
-    tiny.move_const_x(i)
+    def play(note, duration, reverse=1):
+        #duration = 5*duration # microstep resolution
+        global way, current_position
+        way = reverse * way
+        # set note with speed
+        if type(note) is not int:
+            speed = notfreqs[note]
+        else:
+            speed = note
+        tiny.set_speed(speed, tiny.motor.res_x)
+        # set final position
+        steps_to_move = way * speed * duration
+        final_position = current_position + steps_to_move
+        if final_position > 10000 or final_position < 0:
+            # if cannot move forward, change our way
+            way = -way
+            steps_to_move = way * speed * duration
+            final_position = current_position + steps_to_move
 
-    tiny.set_speed(f('D'), tiny.motor.res_x)
-    i += 1000
-    tiny.move_const_x(i)
+        if final_position > 10000 or final_position < 0:
+            raise('range too large')
 
-    tiny.set_speed(f('E'), tiny.motor.res_x)
-    i += 1000
-    tiny.move_const_x(i)
+        current_position = final_position
+        tiny.move_const_x(final_position)
 
-    tiny.set_speed(f('F'), tiny.motor.res_x)
-    i += 1000
-    tiny.move_const_x(i)
+    # Also sprach Python
+    play('C', 1)
+    play('G', 1)
+    play('C2', 1.7)
+    play('E2', 0.3)
+    play('D2#', 1)
+    play('C', 0.3)
+    play('C', 0.3, -1)
+    play('C', 0.3, -1)
+    play('C', 0.3, -1)
+    play('C', 0.3, -1)
+    play('C', 0.3, -1)
+    play('C', 0.3, -1)
+    play('C', 1, -1)
 
-    tiny.set_speed(f('G'), tiny.motor.res_x)
-    i += 1000
-    tiny.move_const_x(i)
+    play('C', 1)
+    play('G', 1)
+    play('C2', 1.7)
+    play('D2#', 0.3)
+    play('E2', 1)
+    play('C', 0.3)
+    play('C', 0.3, -1)
+    play('C', 0.3, -1)
+    play('C', 0.3, -1)
+    play('C', 0.3, -1)
+    play('C', 0.3, -1)
+    play('C', 0.3, -1)
+    play('C', 1, -1)
 
-    tiny.set_speed(f('F'), tiny.motor.res_x)
-    i += 1000
-    tiny.move_const_x(i)
+    play('C', 1)
+    play('G', 1)
+    play('C2', 1.7)
+    play('G2', 0.3)
+    play('A2', 2)
 
-    tiny.set_speed(f('E'), tiny.motor.res_x)
-    i += 1000
-    tiny.move_const_x(i)
 
-    tiny.set_speed(f('D'), tiny.motor.res_x)
-    i += 1000
-    tiny.move_const_x(i)
+    play('A2', 0.33, -1)
+    play('B3', 0.33)
+    play('C3', 1)
+    play('D3', 1)
 
-    tiny.set_speed(f('C'), tiny.motor.res_x)
-    i += 1000
-    tiny.move_const_x(i)
-    import time; time.sleep(2)
+    play('E3', 0.5)
+    play('F3', 0.5)
+    play('G3', 1)
+
+    play('E3', 0.5)
+    play('C3', 0.5)
+    play('G2', 0.5)
+    play('E2', 0.5)
+
+    play('E3', 0.5)
+    play('F3', 0.5)
+    play('G3', 1)
+
+    play('A4', 1)
+    play('B4', 1)
+    play('C4', 2)
+
     tiny.move_var_x(0, 0, 400, 'up')
     sys.exit()
 
-    tiny.set_speed_acca(2)
-    # accelerate to step 500, with speed growing from 0 to 400
-    tiny.move_var_x(8400, 0, 1000, 'up')
-    tiny.move_var_x(9000, 1000, 0, 'down')
-
-    tiny.move_var_x(600, 0, 1000, 'up')
-    tiny.move_var_x(0, 1000, 0, 'down')
 
 
     tiny.move_ramp_x(2000)
@@ -386,6 +435,8 @@ if __name__ =='__main__':
     tiny.move_var_x(2500, 0, 500, 'up')
     tiny.move_ramp_x(500)
     tiny.move_var_x(0, 500, 0, 'down')
+    sys.exit()
+
 
     #ramp tiny.write('\x14\x08\x10\x00' + 3*'\x00\x00\x01\x10')
     #tiny.get_buffer_state()

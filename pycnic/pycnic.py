@@ -4,6 +4,7 @@ import sys
 import pylibusb as usb
 import ctypes
 import time
+import subprocess
 from optparse import OptionParser
 
 TIMEOUT = 500 # timeout for usb read or write
@@ -319,124 +320,36 @@ if __name__ =='__main__':
 
     tiny.tool.speed = 700
     x=0
-    #for tiny.tool.speed in range(0, 950):
-    #    tiny.set_speed(tiny.tool.speed, tiny.motor.res_x)
-    #    tiny.move_const_x(x)
-    #    #time.sleep(0.01)
-    #    x+=5
 
     tiny.set_speed(tiny.tool.speed, tiny.motor.res_x)
 
 
+    tiny.set_speed_acca(4)
+    #tiny.set_speed_accb(2)
 
-    ### music
-    freqs = [ int(220*(2**(1.0/12))**i) for i in range(44) ]
-    notes = [
-             'A',  'A#',  'B',  'C',  'C#',  'D',  'D#',  'E',  'F',  'F#',  'G',  'G#',
-             'A2', 'A2#', 'B2', 'C2', 'C2#', 'D2', 'D2#', 'E2', 'F2', 'F2#', 'G2', 'G2#',
-             'A3', 'A3#', 'B3', 'C3', 'C3#', 'D3', 'D3#', 'E3', 'F3', 'F3#', 'G3', 'G3#',
-             'A4', 'A4#', 'B4', 'C4', 'C4#', 'D4', 'D4#', 'E4', 'F4', 'F4#', 'G4', 'G4#',
-            ]
-    notfreqs = dict(zip(notes, freqs))
+    # launch the burst shoot
+    # D200 took 1.515sec for 8 images
 
-    current_position = 0
-    way = 1 # forward = 1, backward = -1
+    tiny.move_var_x(2400, 0, 30, 'up')
+    tiny.move_var_x(3000, 30, 0, 'down')
 
-    def play(note, duration, reverse=1):
-        #duration = 5*duration # microstep resolution
-        global way, current_position
-        way = reverse * way
-        # set note with speed
-        if type(note) is not int:
-            speed = notfreqs[note]
-        else:
-            speed = note
-        tiny.set_speed(speed, tiny.motor.res_x)
-        # set final position
-        steps_to_move = way * speed * duration
-        final_position = current_position + steps_to_move
-        if final_position > 10000 or final_position < 0:
-            # if cannot move forward, change our way
-            way = -way
-            steps_to_move = way * speed * duration
-            final_position = current_position + steps_to_move
+    tiny.move_var_x(600, 0, 300, 'up')
+    tiny.move_var_x(0, 300, 0, 'down')
 
-        if final_position > 10000 or final_position < 0:
-            raise('range too large')
+    import time
+    time.sleep(1)
 
-        current_position = final_position
-        tiny.move_const_x(final_position)
+    command = ('gphoto2',
+               '--auto-detect',
+               '--set-config',
+               '/main/settings/capturetarget=1',
+               '--set-config',
+               '/main/capturesettings/capturemode=1',
+               '--set-config',
+               '/main/capturesettings/burstnumber=8',
+               '--capture-image')
 
-    # Also sprach Python
-    play('C', 1)
-    play('G', 1)
-    play('C2', 1.7)
-    play('E2', 0.3)
-    play('D2#', 1)
-    play('C', 0.3)
-    play('C', 0.3, -1)
-    play('C', 0.3, -1)
-    play('C', 0.3, -1)
-    play('C', 0.3, -1)
-    play('C', 0.3, -1)
-    play('C', 0.3, -1)
-    play('C', 1, -1)
-
-    play('C', 1)
-    play('G', 1)
-    play('C2', 1.7)
-    play('D2#', 0.3)
-    play('E2', 1)
-    play('C', 0.3)
-    play('C', 0.3, -1)
-    play('C', 0.3, -1)
-    play('C', 0.3, -1)
-    play('C', 0.3, -1)
-    play('C', 0.3, -1)
-    play('C', 0.3, -1)
-    play('C', 1, -1)
-
-    play('C', 1)
-    play('G', 1)
-    play('C2', 1.7)
-    play('G2', 0.3)
-    play('A2', 2)
-
-
-    play('A2', 0.33, -1)
-    play('B3', 0.33)
-    play('C3', 1)
-    play('D3', 1)
-
-    play('E3', 0.5)
-    play('F3', 0.5)
-    play('G3', 1)
-
-    play('E3', 0.5)
-    play('C3', 0.5)
-    play('G2', 0.5)
-    play('E2', 0.5)
-
-    play('E3', 0.5)
-    play('F3', 0.5)
-    play('G3', 1)
-
-    play('A4', 1)
-    play('B4', 1)
-    play('C4', 2)
-
-    tiny.move_var_x(0, 0, 400, 'up')
-    sys.exit()
-
-
-
-    tiny.move_ramp_x(2000)
-    tiny.move_var_x(3000, 500, 0, 'down')
-    tiny.move_var_x(2500, 0, 500, 'up')
-    tiny.move_ramp_x(500)
-    tiny.move_var_x(0, 500, 0, 'down')
-    sys.exit()
-
+    p = subprocess.Popen(command)
 
     #ramp tiny.write('\x14\x08\x10\x00' + 3*'\x00\x00\x01\x10')
     #tiny.get_buffer_state()

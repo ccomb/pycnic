@@ -11,7 +11,7 @@ setup(name='pycnic',
       classifiers=[], # Get strings from http://pypi.python.org/pypi?%3Aaction=list_classifiers
       keywords='cnc usb python',
       author='Christophe Combelles',
-      author_email='ccomb@free.fr',
+      author_email='ccomb@gorfou.fr',
       url='',
       license='LGPL',
       packages=find_packages(exclude=['ez_setup', 'examples', 'tests']),

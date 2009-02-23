@@ -1,3 +1,6 @@
 ^.*pyc$
 ^pycnic.egg-info/.*
 ^bin/.*
+^develop-eggs/.*
+^.installed.cfg$
+curve.ntc$

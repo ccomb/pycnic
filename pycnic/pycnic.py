@@ -141,6 +141,18 @@ class TinyCN(object):
         self.motor = Motor()
         self.tool = Tool()
 
+        # misc tests and inits
+        self.set_prompt(0)
+        self.read_name()
+        self.set_fifo_depth(255) # 255 pulses
+        self.set_pulse_width(64) # 5µs (?)
+        res = self.get_speed_calc()
+        self.tool.numerateur = ByteToInt(res[4:8])
+        self.tool.denominateur = ByteToInt(res[0:4])
+        print('resolution = %s' % ByteToHex(res))
+        print('numerateur = %s' % self.tool.numerateur)
+        print('denominateur = %s' % self.tool.denominateur)
+
     def set_debug(self, debug):
         """takes one arg : debug = True or False
         """
@@ -246,7 +258,7 @@ class TinyCN(object):
         """move to x using ramp
         """
         print_debug('move x to step %s' % steps)
-        tiny.write('\x14\x11\x01\x00' + IntToByte(steps))
+        self.write('\x14\x11\x01\x00' + IntToByte(steps))
 
     def move_var_x(self, steps, start, stop, direction):
         """move to x using ramp
@@ -258,31 +270,31 @@ class TinyCN(object):
         else:
             raise Exception(u'Wrong direction')
         print_debug('move var x to step %s' % steps)
-        tiny.write(cmd + IntToByte(steps) + IntToByte(start) + IntToByte(stop))
+        self.write(cmd + IntToByte(steps) + IntToByte(start) + IntToByte(stop))
 
     def move_const_x(self, steps):
         """Move the motor to a fixed position
         """
         print_debug('move x to step %s' % steps)
-        tiny.write('\x14\x11\x08\x00' + IntToByte(steps))
+        self.write('\x14\x11\x08\x00' + IntToByte(steps))
 
     def move_const_y(self, steps):
         """Move the motor to a fixed position
         """
         print_debug('move y to step %s' % steps)
-        tiny.write('\x14\x12\x08\x00' + IntToByte(steps))
+        self.write('\x14\x12\x08\x00' + IntToByte(steps))
 
     def move_const_z(self, steps):
         """Move the motor to a fixed position
         """
         print_debug('move z to step %s' % steps)
-        tiny.write('\x14\x13\x08\x00' + IntToByte(steps))
+        self.write('\x14\x13\x08\x00' + IntToByte(steps))
 
     def move_const_a(self, steps):
         """Move the motor to a fixed position
         """
         print_debug('move a to step %s' % steps)
-        tiny.write('\x14\x14\x08\x00' + IntToByte(steps))
+        self.write('\x14\x14\x08\x00' + IntToByte(steps))
 
     def get_buffer_state(self):
         print_debug('get_buffer_state')

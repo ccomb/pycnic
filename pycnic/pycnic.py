@@ -157,14 +157,19 @@ class TinyCN(object):
         """takes one arg : debug = True or False
         """
         assert(debug is True or debug is False)
+        global DEBUG
         self.debug = debug
         if debug is True:
             usb.set_debug(True)
+            DEBUG = True
         else:
             usb.set_debug(False)
+            DEBUG = False
 
-    def __XXXdel__(self):
-        usb.release_interface(self.handle, 0) # XXX
+    def __XXXXXdel__(self):
+        #usb.release_interface(self.handle, 0) # XXX
+        usb.detach_kernel_driver_np(self.handle,0)
+        #usb.reset(self.handle)
         usb.close(self.handle)
 
     def write(self, command, alt=0):
@@ -194,6 +199,13 @@ class TinyCN(object):
         hex_state = chr(state) + 3*chr(0)
         self.write(command + hex_state)
 
+    def wait(self, pulses):
+        """Wait during the specified number of pulses
+        """
+        print_debug('Waiting %s pulses...' % pulses)
+        command = '\x18\x06\x08\x00'
+        self.write(command + IntToByte(pulses))
+
     def get_prompt(self):
         print_debug('Reading prompt')
         self.write('\x18\x83\x04\x00')
@@ -201,9 +213,28 @@ class TinyCN(object):
         print_debug('  Got prompt: %s' % prompt)
         return prompt
 
+    def get_status(self):
+        print_debug('Reading status...')
+        self.write('\x18\x89\x04\x00')
+        value = ByteToInt(self.read()[4:8])
+        print_debug('  Got status: %s' % value)
+        return value
+
+    def get_x(self):
+        print_debug('Reading X')
+        self.write('\x10\x81\x04\x00')
+        value = ByteToInt(self.read()[4:8])
+        print_debug('  Got X: %s' % value)
+        return value
+
+    def zero_x(self):
+        print_debug('Resetting X to zero')
+        command = '\x11\x01\x04\x00'
+        self.write(command)
+
     def read_name(self):
         self.write('\x18\x85\x04\x00')
-        self.read()
+        print self.read()
 
     def get_serial(self):
         self.write('\x18\x84\x04\x00')
@@ -221,8 +252,26 @@ class TinyCN(object):
         hex_width = IntToByte(width)
         self.write(command + hex_width)
 
+    def get_speed_max(self):
+        """set the max speed for the ramp
+        """
+        print_debug('Reading max speed...')
+        self.write('\x12\x85\x04\x00')
+        speed = self.read()[4:8]
+        print_debug('  Got max speed = %s' % ByteToHex(speed))
+        return ByteToInt(speed)
+
+    def set_speed_max(self, speed, resolution):
+        print_debug('Setting speed max to %s mm/min' % speed)
+        command = '\x12\x05\x08\x00'
+        speed = speed / 60.0 # convert to mm/s
+        speed = speed * resolution * self.tool.numerateur / self.tool.denominateur # FIXME check
+        hexspeed = IntToByte(int(speed))
+        print_debug('  hex speed max = %s' % ByteToHex(hexspeed))
+        self.write(command + hexspeed)
+
     def get_speed_calc(self):
-        print_debug('Reading speed calc')
+        print_debug('Reading speed calc...')
         self.write('\x12\x89\x04\x00')
         speed_calc = self.read()
         print_debug('  Got speed calc = %s' % ByteToHex(speed_calc))
@@ -238,6 +287,8 @@ class TinyCN(object):
         self.write(command + hexspeed)
 
     def set_speed_acca(self, acc):
+        """Set the slope of the acceleration curve (1 to 10)
+        """
         print_debug('Setting acca to %s mm/min' % acc)
         command = '\x12\x01\x08\x00'
         hexacc = IntToByte(int(acc))
@@ -245,6 +296,9 @@ class TinyCN(object):
         self.write(command + hexacc)
 
     def set_speed_accb(self, acc):
+        """Set the slope of the acceleration curve.
+        Must be 1 for a step motor
+        """
         print_debug('Setting accb to %s mm/min' % acc)
         command = '\x12\x02\x08\x00'
         hexacc = IntToByte(int(acc))
@@ -258,10 +312,14 @@ class TinyCN(object):
         """move to x using ramp
         """
         print_debug('move x to step %s' % steps)
-        self.write('\x14\x11\x01\x00' + IntToByte(steps))
+        self.write('\x14\x01\x08\x00' + IntToByte(steps))
 
     def move_var_x(self, steps, start, stop, direction):
-        """move to x using ramp
+        """move to x with variable speed
+        steps : the target step
+        start : the starting speed
+        stop : the target speed
+        direction : 'up' or 'down' (accelerate or decelerate)
         """
         if direction == 'up':
             cmd = '\x14\xA1\x10\x00'
@@ -307,7 +365,6 @@ class TinyCN(object):
         print_debug('get_fifo_count')
         self.write('\x80\x10')
         state = self.read(1)
-        print_debug(len(state))
         print_debug(ByteToHex(state))
         return ByteToInt(state)
 

@@ -43,6 +43,8 @@ def ByteToInt(byteStr):
         >>> ByteToInt('\x40\x01')
         320
     """
+    if len(byteStr) == 0:
+        return None
     assert(len(byteStr) <= 4)
     return int(''.join(["%02X" % ord(x) for x in reversed(byteStr)]),16)
 
@@ -286,10 +288,17 @@ class TinyCN(object):
         print_debug('  hex speed = %s' % ByteToHex(hexspeed))
         self.write(command + hexspeed)
 
+    def get_speed_acca(self):
+        print_debug('Reading acca...')
+        self.write('\x12\x81\x04\x00')
+        value = ByteToInt(self.read()[4:8])
+        print_debug('  Got acca : %s' % value)
+        return value
+
     def set_speed_acca(self, acc):
         """Set the slope of the acceleration curve (1 to 10)
         """
-        print_debug('Setting acca to %s mm/min' % acc)
+        print_debug('Setting acca to %s' % acc)
         command = '\x12\x01\x08\x00'
         hexacc = IntToByte(int(acc))
         print_debug('  hex acc = %s' % ByteToHex(hexacc))
@@ -363,8 +372,8 @@ class TinyCN(object):
 
     def get_fifo_count(self):
         print_debug('get_fifo_count')
-        self.write('\x80\x10')
-        state = self.read(1)
+        self.write('\x80\x10', alt=1)
+        state = self.read(alt=1)
         print_debug(ByteToHex(state))
         return ByteToInt(state)
 

@@ -1,0 +1,15 @@
+PyCNiC
+======
+
+This library allows to control a tinyCN CNC controler
+
+We can instantiate a TinyCN class, representing the controler:
+
+>>> from pycnic.pycnic import TinyCN
+>>> tiny = TinyCN()
+>>> tiny.name
+    'TinyCN'
+
+We can turn off
+
+>>> tiny.off()

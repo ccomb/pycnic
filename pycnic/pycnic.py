@@ -4,22 +4,19 @@ import pylibusb as usb
 import subprocess
 import sys
 import time
+import logging
+
+logger = logging.getLogger('PyCNiC')
+logging.basicConfig(level=logging.DEBUG)
 
 TIMEOUT = 500 # timeout for usb read or write
 VENDOR_ID = 0x9999
 PRODUCT_ID = 0x0002
 PRODUCT_NAME = u'TinyCN'
 
-global DEBUG
-DEBUG=False
-
-def print_debug(message):
-    if DEBUG:
-        print message
-
 def ByteToHex(byteStr):
     """Converts a byte string to its hex representation
-    
+
         >>> from pycnic import ByteToHex
         >>> ByteToHex('\xFF\xFF')
         'FF FF'
@@ -36,7 +33,7 @@ def ByteToHex(byteStr):
 
 def ByteToInt(byteStr):
     """Converts a little endian (ie reversed) byte string to the corresponding integer
-    
+
         >>> from pycnic import ByteToInt
         >>> ByteToInt('\xFF\xFF')
         65535
@@ -89,71 +86,85 @@ class Motor(object):
     path_length = None
 
 class Tool(object):
-    numerateur = None
-    denominateur = None
+    numerateur = 1
+    denominateur = 1
     speed = None
 
 
 class TinyCN(object):
 
+    handle = None
+    device = None
+    name = None
     motor = None
     tool = None
-    
+    res = None
+    interface_num = 0
+
     def __init__(self, fake=False, debug=False):
         self.fake = fake
         self.debug = debug
         self.set_debug(self.debug)
         if not self.fake:
-            usb.init()
-            if not usb.get_busses():
-                usb.find_busses()
-                usb.find_devices()
-            
-            busses = usb.get_busses()
-            dev = None
-
-            # try to find the device
-            for bus in busses:
-                for device in bus.devices:
-                    if device.descriptor.idVendor == VENDOR_ID \
-                      and device.descriptor.idProduct == PRODUCT_ID:
-                        print_debug(u"found %s!" % PRODUCT_NAME)
-                        dev = device
-                        break
-    
-            if dev is None:
-                raise IOError(u'No device found')
-            self.handle = usb.open(dev)
-            #usb.reset(self.handle)
-        ##
-        #interface_nr = 0
-        #if hasattr(usb,'get_driver_np'):
-        #    # non-portable libusb extension
-        #    name = usb.get_driver_np(self.handle,interface_nr)
-        #    print_debug('Got driver name = %s' % name)
-        #    if name != '':
-        #        print_debug('Detach %s' % name)
-        #        usb.detach_kernel_driver_np(self.handle,interface_nr)
-        #
-        #config = dev.config[0]
-        #usb.set_configuration(self.handle, config.bConfigurationValue)
-        #print_debug('setting configuration %s' % config.bConfigurationValue)
-        #usb.claim_interface(self.handle, interface_nr)
+            self.on()
 
         self.motor = Motor()
         self.tool = Tool()
 
+
+    def off(self):
+        logger.debug('Switching off...')
+        if self.handle is not None:
+            #usb.reset(self.handle)
+            logger.debug('Releasing interface...')
+            usb.release_interface(self.handle, self.interface_num)
+
+            logger.debug('closing handle...')
+            usb.close(self.handle)
+
+            self.handle = None
+
+
+    def on(self):
+        usb.init()
+        if self.handle is not None:
+            return
+
+        if not usb.get_busses():
+            usb.find_busses()
+            usb.find_devices()
+
+        busses = usb.get_busses()
+
+        # try to find the device
+        self.device = None
+        for bus in busses:
+            for device in bus.devices:
+                if device.descriptor.idVendor == VENDOR_ID \
+                  and device.descriptor.idProduct == PRODUCT_ID:
+                    logger.info(u"found %s!", PRODUCT_NAME)
+                    self.device = device
+                    break
+
+        if self.device is None:
+            raise IOError(u'No device found')
+
+        self.handle = usb.open(self.device)
+        logger.debug('Claiming interface... %s' % self.interface_num)
+        usb.claim_interface(self.handle, self.interface_num)
+
+
+        config = self.device.config[0]
+        #logger.info('setting configuration %s' % config.bConfigurationValue)
+        #usb.set_configuration(self.handle, config.bConfigurationValue)
+
         # misc tests and inits
         self.set_prompt(0)
-        self.read_name()
+        self.name = self.read_name()
         self.set_fifo_depth(255) # 255 pulses
         self.set_pulse_width(64) # 5µs (?)
-        res = self.get_speed_calc()
-        self.tool.numerateur = ByteToInt(res[4:8])
-        self.tool.denominateur = ByteToInt(res[0:4])
-        print('resolution = %s' % ByteToHex(res))
-        print('numerateur = %s' % self.tool.numerateur)
-        print('denominateur = %s' % self.tool.denominateur)
+        self.res = self.get_speed_calc()
+
 
     def set_debug(self, debug):
         """takes one arg : debug = True or False
@@ -168,88 +179,127 @@ class TinyCN(object):
             usb.set_debug(False)
             DEBUG = False
 
-    def __XXXXXdel__(self):
-        #usb.release_interface(self.handle, 0) # XXX
-        usb.detach_kernel_driver_np(self.handle,0)
-        #usb.reset(self.handle)
-        usb.close(self.handle)
+    def __del__(self):
+        self.off()
 
     def write(self, command, alt=0):
         buffer = ctypes.create_string_buffer(len(command))
         buffer.value = command
-        print_debug(u'    we write the command %s...' % ByteToHex(buffer.raw))
+        logger.debug(u'    we write the command %s...' % ByteToHex(buffer.raw))
         if not self.fake:
             #P1 : in 0x81, out 0x01
             #P2 : in 0x82, out 0x02
             bytes = usb.bulk_write(self.handle, 0x01+alt, buffer, TIMEOUT)
-            print_debug(u'    %s bytes written' % bytes)
+            logger.debug(u'    %s bytes written' % bytes)
 
-    def read(self, alt=0):
+    def read(self, size, alt=0):
         if self.fake: return
-        buffer = ctypes.create_string_buffer(63) #FIXME 64 au lieu de bytes
-        print_debug(u'    Now we read the result...')
+        buffer = ctypes.create_string_buffer(size)
+        logger.debug(u'    Now we read the result...')
         #P1 : in 0x81, out 0x01
         #P2 : in 0x82, out 0x02
         bytes = usb.bulk_read(self.handle, 0x81 + alt, buffer, TIMEOUT)
         output = buffer.raw[0:bytes]
-        print_debug(u'    %s bytes read: %s' % (bytes, ByteToHex(output)))
+        logger.debug(u'    %s bytes read: %s' % (bytes, ByteToHex(output)))
         return output
 
-    def set_prompt(self, state):
-        print_debug('Setting prompt %s' % state)
+    def read_firmware(self):
+        logger.debug('Reading firmware version')
+        self.write('\x18\x82\x04\x00')
+        version = self.read(32)
+        logger.debug('  Got firmware version: %s' % version)
+        return version
+
+    def stop(self):
+        logger.debug('Stopping...')
+        self.write('\x80\x1B')
+
+    def restart(self):
+        logger.debug('Restarting...')
+        self.write('\x80\x1C')
+
+    def clear_cmd(self):
+        logger.debug('Clearing cmd...')
+        self.write('\x80\x09')
+
+    def read_cmd(self):
+        logger.debug('Reading cmd...')
+        self.write('\x80\x08')
+        return self.read(16)
+
+    def open_buffer(self):
+        logger.debug('Opening buffer...')
+        self.write('\x80\x12')
+
+    def close_buffer(self):
+        logger.debug('Closing buffer...')
+        self.write('\x80\x13')
+
+    def clear_buffer_rx(self):
+        logger.debug('Closing rx buffer...')
+        self.write('\x80\x14')
+
+    def clear_buffer_tx(self):
+        logger.debug('Closing tx buffer...')
+        self.write('\x80\x15')
+
+    def set_prompt(self, prompt):
+        logger.info('Setting prompt %s' % prompt)
         command = '\x18\x03\x08\x00'
-        hex_state = chr(state) + 3*chr(0)
+        hex_state = chr(prompt) + 3*chr(0)
         self.write(command + hex_state)
 
     def wait(self, pulses):
         """Wait during the specified number of pulses
         """
-        print_debug('Waiting %s pulses...' % pulses)
+        logger.debug('Waiting %s pulses...' % pulses)
         command = '\x18\x06\x08\x00'
         self.write(command + IntToByte(pulses))
 
     def get_prompt(self):
-        print_debug('Reading prompt')
+        logger.debug('Reading prompt')
         self.write('\x18\x83\x04\x00')
-        prompt = self.read()
-        print_debug('  Got prompt: %s' % prompt)
+        prompt = self.read(8)
+        logger.debug('  Got prompt: %s' % prompt)
         return prompt
 
     def get_status(self):
-        print_debug('Reading status...')
+        logger.debug('Reading status...')
         self.write('\x18\x89\x04\x00')
-        value = ByteToInt(self.read()[4:8])
-        print_debug('  Got status: %s' % value)
+        value = ByteToInt(self.read(8)[4:8])
+        logger.debug('  Got status: %s' % value)
         return value
 
     def get_x(self):
-        print_debug('Reading X')
+        logger.debug('Reading X')
         self.write('\x10\x81\x04\x00')
-        value = ByteToInt(self.read()[4:8])
-        print_debug('  Got X: %s' % value)
+        value = ByteToInt(self.read(8)[4:8])
+        logger.debug('  Got X: %s' % value)
         return value
 
     def zero_x(self):
-        print_debug('Resetting X to zero')
+        logger.debug('Resetting X to zero')
         command = '\x11\x01\x04\x00'
         self.write(command)
 
     def read_name(self):
         self.write('\x18\x85\x04\x00')
-        print self.read()
+        self.name = self.read(32)
+        logger.debug('Read name = %s', self.name)
+        return self.name
 
     def get_serial(self):
         self.write('\x18\x84\x04\x00')
-        return self.read()
+        return self.read(10)
 
     def set_fifo_depth(self, depth):
-        print_debug('Setting fifo pulse generator to %s pulses' % depth)
+        logger.debug('Setting fifo pulse generator to %s pulses' % depth)
         command = '\x18\x10\x08\x00'
         hex_depth = IntToByte(depth)
         self.write(command + hex_depth)
 
     def set_pulse_width(self, width):
-        print_debug('Setting pulse width to %s ' % width)
+        logger.debug('Setting pulse width to %s ' % width)
         command = '\x13\x08\x08\x00'
         hex_width = IntToByte(width)
         self.write(command + hex_width)
@@ -257,61 +307,61 @@ class TinyCN(object):
     def get_speed_max(self):
         """set the max speed for the ramp
         """
-        print_debug('Reading max speed...')
+        logger.debug('Reading max speed...')
         self.write('\x12\x85\x04\x00')
-        speed = self.read()[4:8]
-        print_debug('  Got max speed = %s' % ByteToHex(speed))
+        speed = self.read(8)[4:8]
+        logger.debug('  Got max speed = %s' % ByteToHex(speed))
         return ByteToInt(speed)
 
     def set_speed_max(self, speed, resolution):
-        print_debug('Setting speed max to %s mm/min' % speed)
+        logger.debug('Setting speed max to %s mm/min' % speed)
         command = '\x12\x05\x08\x00'
         speed = speed / 60.0 # convert to mm/s
         speed = speed * resolution * self.tool.numerateur / self.tool.denominateur # FIXME check
         hexspeed = IntToByte(int(speed))
-        print_debug('  hex speed max = %s' % ByteToHex(hexspeed))
+        logger.debug('  hex speed max = %s' % ByteToHex(hexspeed))
         self.write(command + hexspeed)
 
     def get_speed_calc(self):
-        print_debug('Reading speed calc...')
+        logger.debug('Reading speed calc...')
         self.write('\x12\x89\x04\x00')
-        speed_calc = self.read()
-        print_debug('  Got speed calc = %s' % ByteToHex(speed_calc))
+        speed_calc = self.read(8)
+        logger.debug('  Got speed calc = %s' % ByteToHex(speed_calc))
         return speed_calc
 
     def set_speed(self, speed, resolution):
-        print_debug('Setting speed to %s mm/min' % speed)
+        logger.debug('Setting speed to %s mm/min' % speed)
         command = '\x12\x06\x08\x00'
         speed = speed / 60.0 # convert to mm/s
         speed = speed * resolution * self.tool.numerateur / self.tool.denominateur # FIXME check
         hexspeed = IntToByte(int(speed))
-        print_debug('  hex speed = %s' % ByteToHex(hexspeed))
+        logger.debug('  hex speed = %s' % ByteToHex(hexspeed))
         self.write(command + hexspeed)
 
     def get_speed_acca(self):
-        print_debug('Reading acca...')
+        logger.debug('Reading acca...')
         self.write('\x12\x81\x04\x00')
-        value = ByteToInt(self.read()[4:8])
-        print_debug('  Got acca : %s' % value)
+        value = ByteToInt(self.read(8)[4:8])
+        logger.debug('  Got acca : %s' % value)
         return value
 
     def set_speed_acca(self, acc):
         """Set the slope of the acceleration curve (1 to 10)
         """
-        print_debug('Setting acca to %s' % acc)
+        logger.debug('Setting acca to %s' % acc)
         command = '\x12\x01\x08\x00'
         hexacc = IntToByte(int(acc))
-        print_debug('  hex acc = %s' % ByteToHex(hexacc))
+        logger.debug('  hex acc = %s' % ByteToHex(hexacc))
         self.write(command + hexacc)
 
     def set_speed_accb(self, acc):
         """Set the slope of the acceleration curve.
         Must be 1 for a step motor
         """
-        print_debug('Setting accb to %s mm/min' % acc)
+        logger.debug('Setting accb to %s mm/min' % acc)
         command = '\x12\x02\x08\x00'
         hexacc = IntToByte(int(acc))
-        print_debug('  hex acc = %s' % ByteToHex(hexacc))
+        logger.debug('  hex acc = %s' % ByteToHex(hexacc))
         self.write(command + hexacc)
 
     def move_ramp_xyz(self, x, y, z):
@@ -320,7 +370,7 @@ class TinyCN(object):
     def move_ramp_x(self, steps):
         """move to x using ramp
         """
-        print_debug('move x to step %s' % steps)
+        logger.debug('move x to step %s' % steps)
         self.write('\x14\x01\x08\x00' + IntToByte(steps))
 
     def move_var_x(self, steps, start, stop, direction):
@@ -336,44 +386,51 @@ class TinyCN(object):
             cmd = '\x14\x21\x10\x00'
         else:
             raise Exception(u'Wrong direction')
-        print_debug('move var x to step %s' % steps)
+        logger.debug('move var x to step %s' % steps)
         self.write(cmd + IntToByte(steps) + IntToByte(start) + IntToByte(stop))
 
     def move_const_x(self, steps):
         """Move the motor to a fixed position
         """
-        print_debug('move x to step %s' % steps)
+        logger.debug('move x to step %s' % steps)
         self.write('\x14\x11\x08\x00' + IntToByte(steps))
 
     def move_const_y(self, steps):
         """Move the motor to a fixed position
         """
-        print_debug('move y to step %s' % steps)
+        logger.debug('move y to step %s' % steps)
         self.write('\x14\x12\x08\x00' + IntToByte(steps))
 
     def move_const_z(self, steps):
         """Move the motor to a fixed position
         """
-        print_debug('move z to step %s' % steps)
+        logger.debug('move z to step %s' % steps)
         self.write('\x14\x13\x08\x00' + IntToByte(steps))
 
     def move_const_a(self, steps):
         """Move the motor to a fixed position
         """
-        print_debug('move a to step %s' % steps)
+        logger.debug('move a to step %s' % steps)
         self.write('\x14\x14\x08\x00' + IntToByte(steps))
 
+    def get_state(self):
+        logger.debug('get_state')
+        self.write('\x80\x19')
+        state = self.read(4, alt=1)
+        logger.debug(ByteToHex(state))
+        return state
+
     def get_buffer_state(self):
-        print_debug('get_buffer_state')
+        logger.debug('get_buffer_state')
         self.write('\x80\x18')
-        state = self.read(1)
-        print_debug(ByteToHex(state))
+        state = self.read(4, alt=1)
+        logger.debug(ByteToHex(state))
         return state
 
     def get_fifo_count(self):
-        print_debug('get_fifo_count')
+        logger.debug('get_fifo_count')
         self.write('\x80\x10', alt=1)
-        state = self.read(alt=1)
-        print_debug(ByteToHex(state))
+        state = self.read(4, alt=1)
+        logger.debug(ByteToHex(state))
         return ByteToInt(state)
 

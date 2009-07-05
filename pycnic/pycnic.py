@@ -331,14 +331,14 @@ class TinyCN(object):
     def set_fifo_depth(self, depth):
         logger.debug(u'Setting fifo pulse generator to %s pulses' % depth)
         command = (0x18, 0x10, 0x08, 0x00)
-        hex_depth = int2tuple(depth)
-        self.write(command + hex_depth)
+        tupledepth = int2tuple(depth)
+        self.write(command + tupledepth)
 
     def set_pulse_width(self, width):
         logger.debug(u'Setting pulse width to %s ' % width)
         command = (0x13, 0x08, 0x08, 0x00)
-        hex_width = int2tuple(width)
-        self.write(command + hex_width)
+        tuplewidth = int2tuple(width)
+        self.write(command + tuplewidth)
 
     def get_speed_max(self):
         """set the max speed for the ramp
@@ -346,7 +346,7 @@ class TinyCN(object):
         logger.debug(u'Reading max speed...')
         self.write((0x12, 0x85, 0x04, 0x00))
         speed = self.read(8)[4:8]
-        logger.debug(u'  Got max speed = %s' % byte2hex(speed))
+        logger.debug(u'  Got max speed = %s' % tuple2hex(speed))
         return tuple2int(speed)
 
     def set_speed_max(self, speed, resolution):
@@ -354,9 +354,9 @@ class TinyCN(object):
         command = (0x12, 0x05, 0x08, 0x00)
         speed = speed / 60.0 # convert to mm/s
         speed = speed * resolution * self.tool.numerateur / self.tool.denominateur # FIXME check
-        hexspeed = int2tuple(int(speed))
-        logger.debug(u'  hex speed max = %s' % byte2hex(hexspeed))
-        self.write(command + hexspeed)
+        tuplespeed = int2tuple(int(speed))
+        logger.debug(u'  hex speed max = %s' % tuple2hex(tuplespeed))
+        self.write(command + tuplespeed)
 
     def get_speed_calc(self):
         logger.debug(u'Reading speed calc...')
@@ -397,7 +397,7 @@ class TinyCN(object):
         logger.debug(u'Setting accb to %s mm/min' % acc)
         command = (0x12, 0x02, 0x08, 0x00)
         tupleacc = int2tuple(int(acc))
-        logger.debug(u'  hex acc = %s' % tuple2hex(tuplracc))
+        logger.debug(u'  hex acc = %s' % tuple2hex(tupleacc))
         self.write(command + tupleacc)
 
     def move_ramp_xyz(self, x, y, z):
@@ -453,20 +453,20 @@ class TinyCN(object):
         logger.debug(u'get_state')
         self.write((0x80, 0x19))
         state = self.read(4, alt=1)
-        logger.debug(byte2hex(state))
-        return state
+        logger.debug(tuple2hex(state))
+        return tuple2int(state)
 
     def get_buffer_state(self):
         logger.debug(u'get_buffer_state')
         self.write((0x80, 0x18))
         state = self.read(4, alt=1)
-        logger.debug(byte2hex(state))
-        return state
+        logger.debug(tuple2hex(state))
+        return tuple2int(state)
 
     def get_fifo_count(self):
         logger.debug(u'get_fifo_count')
         self.write((0x80, 0x10), alt=1)
         state = self.read(4, alt=1)
-        logger.debug(byte2hex(state))
+        logger.debug(tuple2hex(state))
         return tuple2int(state)
 

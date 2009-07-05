@@ -310,10 +310,6 @@ class TinyCN(object):
     def get_x(self):
         logger.debug(u'Reading X')
         self.write((0x10, 0x81, 0x04, 0x00))
-        r = self.read(8)
-        import pdb; pdb.set_trace()
-        r = r[4:8]
-        r = tuple2int(r)
         value = tuple2int(self.read(8)[4:8])
         logger.debug(u'  Got X: %s' % value)
         return value

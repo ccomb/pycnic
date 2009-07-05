@@ -111,13 +111,15 @@ def tuple2int(tup):
 
     >>> from pycnic import tuple2int
     >>> tuple2int( (12, 01, 01) )
-    786689
+    65804
     >>> tuple2int( (01, 00) )
-    256
-    >>> tuple2int( (00, 02) )
+    1
+    >>> tuple2int( (02, 00) )
     2
+    >>> tuple2int( (100, 0, 0, 0) )
+    100
     """
-    return int(''.join(["%02X" % i for i in tup]),16)
+    return int(''.join(["%02X" % i for i in reversed(tup)]),16)
 
 
 class Motor(object):
@@ -308,8 +310,12 @@ class TinyCN(object):
     def get_x(self):
         logger.debug(u'Reading X')
         self.write((0x10, 0x81, 0x04, 0x00))
+        r = self.read(8)
+        import pdb; pdb.set_trace()
+        r = r[4:8]
+        r = tuple2int(r)
         value = tuple2int(self.read(8)[4:8])
-        logger.debug(u'  Got X: %s' % tuple2str(value))
+        logger.debug(u'  Got X: %s' % value)
         return value
 
     def zero_x(self):
@@ -326,7 +332,9 @@ class TinyCN(object):
 
     def get_serial(self):
         self.write((0x18, 0x84, 0x04, 0x00))
-        return self.read(10)
+        serial = self.read(10)
+        logger.debug(u'Got serial number = %s', tuple2str(serial))
+        return tuple2str(serial)
 
     def set_fifo_depth(self, depth):
         logger.debug(u'Setting fifo pulse generator to %s pulses' % depth)

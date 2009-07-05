@@ -1,10 +1,11 @@
 # coding: utf-8
 import ctypes
-import pylibusb as usb
+import logging
+import string
 import subprocess
 import sys
 import time
-import logging
+import usb
 
 logger = logging.getLogger('PyCNiC')
 logging.basicConfig(level=logging.DEBUG)
@@ -14,14 +15,14 @@ VENDOR_ID = 0x9999
 PRODUCT_ID = 0x0002
 PRODUCT_NAME = u'TinyCN'
 
-def ByteToHex(byteStr):
+def byte2hex(byteStr):
     """Converts a byte string to its hex representation
 
-        >>> from pycnic import ByteToHex
-        >>> ByteToHex('\xFF\xFF')
-        'FF FF'
-        >>> ByteToHex('\xAA\xAA\xAA')
-        'AA AA AA'
+    >>> from pycnic import byte2hex
+    >>> byte2hex('\xFF\xFF')
+    'FF FF'
+    >>> byte2hex('\xAA\xAA\xAA')
+    'AA AA AA'
 
     """
     try:
@@ -31,14 +32,16 @@ def ByteToHex(byteStr):
     return ''.join(["%02X " % ord(x) for x in byteStr] ).strip() #+ pretty
 
 
-def ByteToInt(byteStr):
+def byte2int(byteStr):
     """Converts a little endian (ie reversed) byte string to the corresponding integer
 
-        >>> from pycnic import ByteToInt
-        >>> ByteToInt('\xFF\xFF')
-        65535
-        >>> ByteToInt('\x40\x01')
-        320
+    >>> from pycnic import byte2int
+    >>> byte2int('\xFF\xFF')
+    65535
+    >>> byte2int('\x40\x01')
+    320
+    >>> byte2int('\x40\x01\x01\x01')
+    16843072
     """
     if len(byteStr) == 0:
         return None
@@ -46,23 +49,76 @@ def ByteToInt(byteStr):
     return int(''.join(["%02X" % ord(x) for x in reversed(byteStr)]),16)
 
 
-def IntToByte(integer):
-    """Converts an integer to its corresponding little endian (ie reversed) byte string
+def int2byte(integer):
+    """Converts an integer to its corresponding little endian (ie reversed) 4-byte string
 
-    >>> from pycnic import IntToByte, ByteToHex
-    >>> print IntToByte(0x00)
+    >>> from pycnic import int2byte
+    >>> print int2byte(0x00)
     \x00\x00\x00\x00
-    >>> print IntToByte(0x01)
+    >>> print int2byte(0x01)
     \x01\x00\x00\x00
-    >>> print IntToByte(0xFF)
+    >>> print int2byte(0xFF)
     \xff\x00\x00\x00
-    >>> print IntToByte(0x746F)
+    >>> print int2byte(0x746F)
     \x6F\x74\x00\x00
-    >>> print IntToByte(0x746F746F)
+    >>> print int2byte(0x746F746F)
     \x6F\x74\x6F\x74
     """
     #not reversed : return ''.join([ chr(integer%(256**i)/256**(i-1)) for i in range(4,0,-1)])
     return ''.join([ chr(integer%(256**i)/256**(i-1)) for i in range(1,5)])
+
+def int2tuple(integer):
+    """Converts an integer to its corresponding little endian (ie reversed) 4-byte tuple
+
+    >>> from pycnic import int2tuple
+    >>> print int2tuple(0x00)
+    (0, 0, 0, 0)
+    >>> print int2tuple(0x01)
+    (1, 0, 0, 0)
+    >>> print int2tuple(0xFF)
+    (255, 0, 0, 0)
+    >>> print int2tuple(0x746F)
+    (111, 116, 0, 0)
+    >>> print int2tuple(0x746F746F)
+    (111, 116, 111, 116)
+    """
+    #not reversed : return ''.join([ chr(integer%(256**i)/256**(i-1)) for i in range(4,0,-1)])
+    return tuple([ int(integer%(256**i)/256**(i-1)) for i in range(1,5)])
+
+
+def tuple2hex(tup):
+    """Converts a data tuple of integers to its hex representation
+
+    >>> from pycnic import tuple2hex
+    >>> tuple2hex( (1,2,3) )
+    '01 02 03'
+    >>> tuple2hex( (30,40,110) )
+    '1E 28 6E'
+    """
+    return ' '.join(["%02X" % i for i in tup])
+
+def tuple2str(tup):
+    """Converts a data tuple of integers to its string representation
+
+    >>> from pycnic import tuple2str
+    >>> tuple2str( (84, 105, 110, 121, 67, 78) )
+    'TinyCN'
+    """
+    return ''.join([chr(i) for i in tup])
+
+def tuple2int(tup):
+    """Converts a tuple of int to the equivalent int
+
+    >>> from pycnic import tuple2int
+    >>> tuple2int( (12, 01, 01) )
+    786689
+    >>> tuple2int( (01, 00) )
+    256
+    >>> tuple2int( (00, 02) )
+    2
+    """
+    return int(''.join(["%02X" % i for i in tup]),16)
+
 
 class Motor(object):
     res_x = None # resolution in step/mm
@@ -115,33 +171,23 @@ class TinyCN(object):
     def off(self):
         logger.debug(u'Switching off...')
         if self.handle is not None:
-
             logger.debug(u'Releasing interface...')
-            usb.release_interface(self.handle, self.interface_num)
-
-            logger.debug(u'closing handle...')
-            usb.close(self.handle)
-
+            self.handle.releaseInterface()
             self.handle = None
 
 
     def on(self):
-        usb.init()
         if self.handle is not None:
             return
 
-        if not usb.get_busses():
-            usb.find_busses()
-            usb.find_devices()
-
-        busses = usb.get_busses()
+        busses = usb.busses()
 
         # try to find the device
         self.device = None
         for bus in busses:
             for device in bus.devices:
-                if device.descriptor.idVendor == VENDOR_ID \
-                  and device.descriptor.idProduct == PRODUCT_ID:
+                if device.idVendor == VENDOR_ID \
+                  and device.idProduct == PRODUCT_ID:
                     logger.info(u"found %s!", PRODUCT_NAME)
                     self.device = device
                     break
@@ -149,9 +195,9 @@ class TinyCN(object):
         if self.device is None:
             raise IOError(u'No device found')
 
-        self.handle = usb.open(self.device)
+        self.handle = self.device.open()
         logger.debug(u'Claiming interface... %s' % self.interface_num)
-        usb.claim_interface(self.handle, self.interface_num)
+        self.handle.claimInterface(self.interface_num)
 
         # misc tests and inits
         self.set_prompt(0)
@@ -168,175 +214,170 @@ class TinyCN(object):
         global DEBUG
         self.debug = debug
         if debug is True:
-            usb.set_debug(True)
             DEBUG = True
         else:
-            usb.set_debug(False)
             DEBUG = False
 
     def __del__(self):
         self.off()
 
-    def write(self, command, alt=0):
-        buffer = ctypes.create_string_buffer(len(command))
-        buffer.value = command
-        logger.debug(u'    we write the command %s...' % ByteToHex(buffer.raw))
+    def write(self, buffer, alt=0):
+        logger.debug(u'    we write the command %s...' % tuple2hex(buffer))
         if not self.fake:
             #P1 : in 0x81, out 0x01
             #P2 : in 0x82, out 0x02
-            bytes = usb.bulk_write(self.handle, 0x01+alt, buffer, TIMEOUT)
+            bytes = self.handle.bulkWrite(0x01+alt, buffer, TIMEOUT)
             logger.debug(u'    %s bytes written' % bytes)
 
     def read(self, size, alt=0):
         if self.fake: return
-        buffer = ctypes.create_string_buffer(size)
         logger.debug(u'    Now we read the result...')
         #P1 : in 0x81, out 0x01
         #P2 : in 0x82, out 0x02
-        bytes = usb.bulk_read(self.handle, 0x81 + alt, buffer, TIMEOUT)
-        output = buffer.raw[0:bytes]
-        logger.debug(u'    %s bytes read: %s' % (bytes, ByteToHex(output)))
-        return output
+        buffer = self.handle.bulkRead(0x81 + alt, size, TIMEOUT)
+        logger.debug(u'    %s bytes read: %s' % (len(buffer), tuple2hex(buffer)))
+        return buffer
 
     def read_firmware(self):
-        logger.debug(u'Reading firmware version')
-        self.write('\x18\x82\x04\x00')
+        logger.debug(u'Reading firmware version...')
+        self.write((0x18, 0x82, 0x04, 0x00))
         version = self.read(32)
-        logger.debug(u'  Got firmware version: %s' % version)
+        logger.debug(u'  Got firmware version: %s' % tuple2str(version))
         return version
 
     def stop(self):
         logger.debug(u'Stopping...')
-        self.write('\x80\x1B')
+        self.write((0x80, 0x1B))
 
     def restart(self):
         logger.debug(u'Restarting...')
-        self.write('\x80\x1C')
+        self.write((0x80, 0x1C))
 
     def clear_cmd(self):
         logger.debug(u'Clearing cmd...')
-        self.write('\x80\x09')
+        self.write((0x80, 0x09))
 
     def read_cmd(self):
         logger.debug(u'Reading cmd...')
-        self.write('\x80\x08')
+        self.write((0x80, 0x08))
         return self.read(16)
 
     def open_buffer(self):
         logger.debug(u'Opening buffer...')
-        self.write('\x80\x12')
+        self.write((0x80, 0x12))
 
     def close_buffer(self):
         logger.debug(u'Closing buffer...')
-        self.write('\x80\x13')
+        self.write((0x80, 0x13))
 
     def clear_buffer_rx(self):
         logger.debug(u'Clearing rx buffer...')
-        self.write('\x80\x14')
+        self.write((0x80, 0x14))
 
     def clear_buffer_tx(self):
         logger.debug(u'Clearing tx buffer...')
-        self.write('\x80\x15')
+        self.write((0x80, 0x15))
 
     def set_prompt(self, prompt):
-        logger.info(u'Setting prompt %s' % prompt)
-        command = '\x18\x03\x08\x00'
-        hex_state = chr(prompt) + 3*chr(0)
-        self.write(command + hex_state)
+        logger.info(u'Setting prompt = "%s"' % prompt)
+        command = (0x18, 0x03, 0x08, 0x00)
+        state = (prompt, 0, 0, 0)
+        self.write(command + state)
 
     def wait(self, pulses):
         """Wait during the specified number of pulses
         """
-        logger.debug(u'Waiting %s pulses...' % pulses)
-        command = '\x18\x06\x08\x00'
-        self.write(command + IntToByte(pulses))
+        logger.debug(u'Waiting %s pulses...' % tuple2str(pulses))
+        command = (0x18, 0x06, 0x08, 0x00)
+        self.write(command + int2tuple(pulses))
 
     def get_prompt(self):
         logger.debug(u'Reading prompt')
-        self.write('\x18\x83\x04\x00')
+        self.write((0x18, 0x83, 0x04, 0x00))
         prompt = self.read(8)
-        logger.debug(u'  Got prompt: %s' % prompt)
+        logger.debug(u'  Got prompt: %s' % tuple2str(prompt))
         return prompt
 
     def get_status(self):
         logger.debug(u'Reading status...')
-        self.write('\x18\x89\x04\x00')
-        value = ByteToInt(self.read(8)[4:8])
+        self.write((0x18, 0x89, 0x04, 0x00))
+        value = tuple2int(self.read(8)[4:8])
         logger.debug(u'  Got status: %s' % value)
         return value
 
     def get_x(self):
         logger.debug(u'Reading X')
-        self.write('\x10\x81\x04\x00')
-        value = ByteToInt(self.read(8)[4:8])
-        logger.debug(u'  Got X: %s' % value)
+        self.write((0x10, 0x81, 0x04, 0x00))
+        value = tuple2int(self.read(8)[4:8])
+        logger.debug(u'  Got X: %s' % tuple2str(value))
         return value
 
     def zero_x(self):
         logger.debug(u'Resetting X to zero')
-        command = '\x11\x01\x04\x00'
+        command = (0x11, 0x01, 0x04, 0x00)
         self.write(command)
 
     def read_name(self):
-        self.write('\x18\x85\x04\x00')
-        self.name = self.read(32)
+        command = (0x18, 0x85, 0x04, 0x00)
+        self.write(command)
+        self.name = tuple2str(self.read(32))
         logger.debug(u'Read name = %s', self.name)
         return self.name
 
     def get_serial(self):
-        self.write('\x18\x84\x04\x00')
+        self.write((0x18, 0x84, 0x04, 0x00))
         return self.read(10)
 
     def set_fifo_depth(self, depth):
         logger.debug(u'Setting fifo pulse generator to %s pulses' % depth)
-        command = '\x18\x10\x08\x00'
-        hex_depth = IntToByte(depth)
+        command = (0x18, 0x10, 0x08, 0x00)
+        hex_depth = int2tuple(depth)
         self.write(command + hex_depth)
 
     def set_pulse_width(self, width):
         logger.debug(u'Setting pulse width to %s ' % width)
-        command = '\x13\x08\x08\x00'
-        hex_width = IntToByte(width)
+        command = (0x13, 0x08, 0x08, 0x00)
+        hex_width = int2tuple(width)
         self.write(command + hex_width)
 
     def get_speed_max(self):
         """set the max speed for the ramp
         """
         logger.debug(u'Reading max speed...')
-        self.write('\x12\x85\x04\x00')
+        self.write((0x12, 0x85, 0x04, 0x00))
         speed = self.read(8)[4:8]
-        logger.debug(u'  Got max speed = %s' % ByteToHex(speed))
-        return ByteToInt(speed)
+        logger.debug(u'  Got max speed = %s' % byte2hex(speed))
+        return tuple2int(speed)
 
     def set_speed_max(self, speed, resolution):
         logger.debug(u'Setting speed max to %s mm/min' % speed)
-        command = '\x12\x05\x08\x00'
+        command = (0x12, 0x05, 0x08, 0x00)
         speed = speed / 60.0 # convert to mm/s
         speed = speed * resolution * self.tool.numerateur / self.tool.denominateur # FIXME check
-        hexspeed = IntToByte(int(speed))
-        logger.debug(u'  hex speed max = %s' % ByteToHex(hexspeed))
+        hexspeed = int2tuple(int(speed))
+        logger.debug(u'  hex speed max = %s' % byte2hex(hexspeed))
         self.write(command + hexspeed)
 
     def get_speed_calc(self):
         logger.debug(u'Reading speed calc...')
-        self.write('\x12\x89\x04\x00')
+        self.write((0x12, 0x89, 0x04, 0x00))
         speed_calc = self.read(8)
-        logger.debug(u'  Got speed calc = %s' % ByteToHex(speed_calc))
+        logger.debug(u'  Got speed calc = %s' % tuple2hex(speed_calc))
         return speed_calc
 
     def set_speed(self, speed, resolution):
         logger.debug(u'Setting speed to %s mm/min' % speed)
-        command = '\x12\x06\x08\x00'
+        command = (0x12, 0x06, 0x08, 0x00)
         speed = speed / 60.0 # convert to mm/s
         speed = speed * resolution * self.tool.numerateur / self.tool.denominateur # FIXME check
-        hexspeed = IntToByte(int(speed))
-        logger.debug(u'  hex speed = %s' % ByteToHex(hexspeed))
-        self.write(command + hexspeed)
+        tuplespeed = int2tuple(int(speed))
+        logger.debug(u'  hex speed = %s' % tuple2hex(tuplespeed))
+        self.write(command + tuplespeed)
 
     def get_speed_acca(self):
         logger.debug(u'Reading acca...')
-        self.write('\x12\x81\x04\x00')
-        value = ByteToInt(self.read(8)[4:8])
+        self.write((0x12, 0x81, 0x04, 0x00))
+        value = tuple2int(self.read(8)[4:8])
         logger.debug(u'  Got acca : %s' % value)
         return value
 
@@ -344,20 +385,20 @@ class TinyCN(object):
         """Set the slope of the acceleration curve (1 to 10)
         """
         logger.debug(u'Setting acca to %s' % acc)
-        command = '\x12\x01\x08\x00'
-        hexacc = IntToByte(int(acc))
-        logger.debug(u'  hex acc = %s' % ByteToHex(hexacc))
-        self.write(command + hexacc)
+        command = (0x12, 0x01, 0x08, 0x00)
+        tupleacc = int2tuple(int(acc))
+        logger.debug(u'  hex acc = %s' % tuple2hex(tupleacc))
+        self.write(command + tupleacc)
 
     def set_speed_accb(self, acc):
         """Set the slope of the acceleration curve.
         Must be 1 for a step motor
         """
         logger.debug(u'Setting accb to %s mm/min' % acc)
-        command = '\x12\x02\x08\x00'
-        hexacc = IntToByte(int(acc))
-        logger.debug(u'  hex acc = %s' % ByteToHex(hexacc))
-        self.write(command + hexacc)
+        command = (0x12, 0x02, 0x08, 0x00)
+        tupleacc = int2tuple(int(acc))
+        logger.debug(u'  hex acc = %s' % tuple2hex(tuplracc))
+        self.write(command + tupleacc)
 
     def move_ramp_xyz(self, x, y, z):
         raise NotImplementedError
@@ -366,7 +407,7 @@ class TinyCN(object):
         """move to x using ramp
         """
         logger.debug(u'move x to step %s' % steps)
-        self.write('\x14\x01\x08\x00' + IntToByte(steps))
+        self.write((0x14, 0x01, 0x08, 0x00) + int2tuple(steps))
 
     def move_var_x(self, steps, start, stop, direction):
         """move to x with variable speed
@@ -376,56 +417,56 @@ class TinyCN(object):
         direction : 'up' or 'down' (accelerate or decelerate)
         """
         if direction == 'up':
-            cmd = '\x14\xA1\x10\x00'
+            cmd = (0x14, 0xA1, 0x10, 0x00)
         elif direction == 'down':
-            cmd = '\x14\x21\x10\x00'
+            cmd = (0x14, 0x21, 0x10, 0x00)
         else:
             raise Exception(u'Wrong direction')
         logger.debug(u'move var x to step %s' % steps)
-        self.write(cmd + IntToByte(steps) + IntToByte(start) + IntToByte(stop))
+        self.write(cmd + int2tuple(steps) + int2tuple(start) + int2tuple(stop))
 
     def move_const_x(self, steps):
         """Move the motor to a fixed position
         """
         logger.debug(u'move x to step %s' % steps)
-        self.write('\x14\x11\x08\x00' + IntToByte(steps))
+        self.write((0x14, 0x11, 0x08, 0x00) + int2tuple(steps))
 
     def move_const_y(self, steps):
         """Move the motor to a fixed position
         """
         logger.debug(u'move y to step %s' % steps)
-        self.write('\x14\x12\x08\x00' + IntToByte(steps))
+        self.write((0x14, 0x12, 0x08, 0x00) + int2tuple(steps))
 
     def move_const_z(self, steps):
         """Move the motor to a fixed position
         """
         logger.debug(u'move z to step %s' % steps)
-        self.write('\x14\x13\x08\x00' + IntToByte(steps))
+        self.write((0x14, 0x13, 0x08, 0x00) + int2tuple(steps))
 
     def move_const_a(self, steps):
         """Move the motor to a fixed position
         """
         logger.debug(u'move a to step %s' % steps)
-        self.write('\x14\x14\x08\x00' + IntToByte(steps))
+        self.write((0x14, 0x14, 0x08, 0x00) + int2tuple(steps))
 
     def get_state(self):
         logger.debug(u'get_state')
-        self.write('\x80\x19')
+        self.write((0x80, 0x19))
         state = self.read(4, alt=1)
-        logger.debug(ByteToHex(state))
+        logger.debug(byte2hex(state))
         return state
 
     def get_buffer_state(self):
         logger.debug(u'get_buffer_state')
-        self.write('\x80\x18')
+        self.write((0x80, 0x18))
         state = self.read(4, alt=1)
-        logger.debug(ByteToHex(state))
+        logger.debug(byte2hex(state))
         return state
 
     def get_fifo_count(self):
         logger.debug(u'get_fifo_count')
-        self.write('\x80\x10', alt=1)
+        self.write((0x80, 0x10), alt=1)
         state = self.read(4, alt=1)
-        logger.debug(ByteToHex(state))
-        return ByteToInt(state)
+        logger.debug(byte2hex(state))
+        return tuple2int(state)
 

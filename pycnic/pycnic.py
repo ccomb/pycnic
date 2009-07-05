@@ -10,7 +10,7 @@ import usb
 logger = logging.getLogger('PyCNiC')
 logging.basicConfig(level=logging.DEBUG)
 
-TIMEOUT = 500 # timeout for usb read or write
+TIMEOUT = 200 # timeout for usb read or write
 VENDOR_ID = 0x9999
 PRODUCT_ID = 0x0002
 PRODUCT_NAME = u'TinyCN'
@@ -165,10 +165,8 @@ class TinyCN(object):
         self.set_debug(self.debug)
         if not self.fake:
             self.on()
-
         self.motor = Motor()
         self.tool = Tool()
-
 
     def off(self):
         logger.debug(u'Switching off...')
@@ -176,7 +174,6 @@ class TinyCN(object):
             logger.debug(u'Releasing interface...')
             self.handle.releaseInterface()
             self.handle = None
-
 
     def on(self):
         if self.handle is not None:
@@ -197,17 +194,26 @@ class TinyCN(object):
         if self.device is None:
             raise IOError(u'No device found')
 
+        logger.debug(u'Opening device...')
         self.handle = self.device.open()
+
+        #logger.debug(u'Detach kernel driver...')
+        #interface = self.device.configurations[0].interfaces[0][0]
+        #self.handle.detachKernelDriver(interface)
+
         logger.debug(u'Claiming interface... %s' % self.interface_num)
         self.handle.claimInterface(self.interface_num)
 
         # misc tests and inits
         self.set_prompt(0)
-        self.name = self.read_name()
+        try:
+            self.name = self.read_name()
+        except:
+            self.off()
+            self.on()
         self.set_fifo_depth(255) # 255 pulses
         self.set_pulse_width(64) # 5µs (?)
         self.res = self.get_speed_calc()
-
 
     def set_debug(self, debug):
         """takes one arg : debug = True or False
@@ -308,22 +314,24 @@ class TinyCN(object):
         return value
 
     def get_x(self):
-        logger.debug(u'Reading X')
+        logger.debug(u'Reading X...')
         self.write((0x10, 0x81, 0x04, 0x00))
         value = tuple2int(self.read(8)[4:8])
         logger.debug(u'  Got X: %s' % value)
         return value
 
     def zero_x(self):
-        logger.debug(u'Resetting X to zero')
+        logger.debug(u'Resetting X to zero...')
         command = (0x11, 0x01, 0x04, 0x00)
         self.write(command)
 
     def read_name(self):
+        logger.debug(u'Reading name...')
         command = (0x18, 0x85, 0x04, 0x00)
         self.write(command)
-        self.name = tuple2str(self.read(32))
-        logger.debug(u'Read name = %s', self.name)
+        name = self.read(32)
+        self.name = tuple2str(name)
+        logger.debug(u'Read name = %s (%s)' % (tuple2hex(name), self.name))
         return self.name
 
     def get_serial(self):

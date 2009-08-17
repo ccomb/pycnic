@@ -1,5 +1,6 @@
 # coding: utf-8
 import ctypes
+import pdb
 import logging
 import string
 import subprocess
@@ -206,11 +207,7 @@ class TinyCN(object):
 
         # misc tests and inits
         self.set_prompt(0)
-        try:
-            self.name = self.read_name()
-        except:
-            self.off()
-            self.on()
+        self.name = self.read_name()
         self.set_fifo_depth(255) # 255 pulses
         self.set_pulse_width(64) # 5µs (?)
         self.res = self.get_speed_calc()

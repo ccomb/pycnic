@@ -185,6 +185,9 @@ class InterpCNC(object):
         >>> cnc.move(x=10, y=20, z=30)
         >>> cnc.x, cnc.y, cnc.z
         (10, 20, 30)
+        >>> cnc.move(x=30, y=10, z=20)
+        >>> cnc.x, cnc.y, cnc.z
+        (30, 10, 20)
 
 
         """

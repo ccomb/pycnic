@@ -81,7 +81,7 @@ class InterpCNC(object):
         """write a parameter into the EEPROM
         This should probably not be abused to save the EEPROM.
         """
-        return self.execute('WP' + param + 'V' + value)
+        return self.execute('WP' + param + 'V' + str(value))
 
     #
     # Informative commands
@@ -195,6 +195,8 @@ class InterpCNC(object):
             raise ValueError(u'Please specify at least one axis to move')
 
         values = [('X',x), ('Y',y), ('Z',z)]
+        # the card wants the biggest move to be at the left.
+        values.sort(key=lambda x:x[1], reverse=True)
         command += ''.join([val[0] + str(val[1]) for val in values if val[1] is not None])
         self.execute(command)
 
@@ -229,9 +231,17 @@ class InterpCNC(object):
         >>> cnc.z = 2
         >>> cnc.x, cnc.y, cnc.z
         (0, 1, 2)
+
+        If value is None, perform a calibration on the specified axis
+        >>> cnc.x = None
+
         """
         if axis not in ('x', 'y', 'z'):
             raise ValueError(u'Bad axis')
+        if value is None:
+            # calibration with home sensor
+            self.execute('HX')
+            return
         self.execute('W' + axis.upper() + str(value))
 
     x = property(lambda self: self._get_axis('x'), lambda self, val: self._set_axis('x', val))
@@ -284,7 +294,6 @@ class InterpCNC(object):
         0
         """
         self.execute('E')
-
 
 
 

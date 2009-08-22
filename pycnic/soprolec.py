@@ -56,13 +56,16 @@ class InterpCNC(object):
         """Write a command to the controller.
         """
         self.port.write(command)
+        self.port.flush()
 
     def execute(self, command):
         """execute a command by sending it to the controller,
         and returning its response.
         The result should be interpreted by the caller.
         """
-        self._write(command + ';')
+        command += ';'
+        logger.debug(u'Executing command: %s' % command)
+        self._write(command)
         response = self._read()
         if response.startswith('=') and response.endswith(self.prompt):
             return response[1:-1]
@@ -141,28 +144,57 @@ class InterpCNC(object):
     #
     # linear moves
     #
-    def move(self, x=None, y=None, z=None, a=None, ramp=True):
+    def move(self, x=None, y=None, z=None, ramp=True):
         """Move specified axis to specified step using a ramp or not
 
         >>> cnc = InterpCNC(speed=440)
+
+        We must specify one axis
+
         >>> cnc.move()
         Traceback (most recent call last):
         ...
-        ValueError: Please specify at least an axis to move
+        ValueError: Please specify at least one axis to move
+
+        We can move any axis:
+
         >>> cnc.move(x=10)
-        >>> cnc.x
-        10
+        >>> cnc.x, cnc.y, cnc.z
+        (10, 0, 0)
         >>> cnc.move(x=0, ramp=False)
-        >>> cnc.x
-        0
+        >>> cnc.x, cnc.y, cnc.z
+        (0, 0, 0)
+
+        >>> cnc.move(y=10)
+        >>> cnc.x, cnc.y, cnc.z
+        (0, 10, 0)
+        >>> cnc.move(y=0, ramp=False)
+        >>> cnc.x, cnc.y, cnc.z
+        (0, 0, 0)
+
+        >>> cnc.move(z=10)
+        >>> cnc.x, cnc.y, cnc.z
+        (0, 0, 10)
+        >>> cnc.move(z=0, ramp=False)
+        >>> cnc.x, cnc.y, cnc.z
+        (0, 0, 0)
+
+        We can move to any point using all axis in one move:
+        >>> cnc.x, cnc.y, cnc.z
+        (0, 0, 0)
+        >>> cnc.move(x=10, y=20, z=30)
+        >>> cnc.x, cnc.y, cnc.z
+        (10, 20, 30)
+
+
         """
         if ramp: command = 'L'
         if not ramp: command = 'LL'
 
-        if (x, y, z, a) == (None, None, None, None):
-            raise ValueError(u'Please specify at least an axis to move')
+        if (x, y, z) == (None, None, None):
+            raise ValueError(u'Please specify at least one axis to move')
 
-        values = [('X',x), ('Y',y), ('Z',z), ('A',a)]
+        values = [('X',x), ('Y',y), ('Z',z)]
         command += ''.join([val[0] + str(val[1]) for val in values if val[1] is not None])
         self.execute(command)
 
@@ -177,7 +209,7 @@ class InterpCNC(object):
         >>> cnc._get_axis('x')
         0
         """
-        if axis not in ('x', 'y', 'z', 'a'):
+        if axis not in ('x', 'y', 'z'):
             raise ValueError(u'Bad axis')
         return int(self.execute('R' + axis.upper()))
 
@@ -195,18 +227,16 @@ class InterpCNC(object):
         0
         >>> cnc.y = 1
         >>> cnc.z = 2
-        >>> cnc.a = 3
-        >>> cnc.x, cnc.y, cnc.z, cnc.a
-        (0, 1, 2, 3)
+        >>> cnc.x, cnc.y, cnc.z
+        (0, 1, 2)
         """
-        if axis not in ('x', 'y', 'z', 'a'):
+        if axis not in ('x', 'y', 'z'):
             raise ValueError(u'Bad axis')
         self.execute('W' + axis.upper() + str(value))
 
     x = property(lambda self: self._get_axis('x'), lambda self, val: self._set_axis('x', val))
     y = property(lambda self: self._get_axis('y'), lambda self, val: self._set_axis('y', val))
     z = property(lambda self: self._get_axis('z'), lambda self, val: self._set_axis('z', val))
-    a = property(lambda self: self._get_axis('a'), lambda self, val: self._set_axis('a', val))
 
     def _get_speed(self):
         """Get the current speed used for next move

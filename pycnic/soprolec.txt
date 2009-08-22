@@ -35,7 +35,7 @@ We can read parameters using a higher level API:
 >>> icnc.firmware_major
 3
 
-We can set the speed and move along the X axis using a ramp:
+We can set the speed and move along an axis using a ramp:
 
 >>> icnc.connect()
 >>> icnc.speed = 50

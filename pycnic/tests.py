@@ -1,7 +1,6 @@
 import time
 import unittest, doctest
-import pycnic
-from pycnic import TinyCN
+import techlf
 import tests
 
 class TestTinyCN(unittest.TestCase):
@@ -9,20 +8,20 @@ class TestTinyCN(unittest.TestCase):
         """Check USB resources are correctly released.
         We should be able to open the device twice
         """
-        tiny = TinyCN()
+        tiny = techlf.TinyCN()
         self.assertEqual(tiny.name, 'TinyCN')
         #print tiny.read_firmware()
         del tiny
 
 
-        tiny = TinyCN()
+        tiny = techlf.TinyCN()
         tiny.move_ramp_x(200)
         tiny.move_ramp_x(0)
         while tiny.get_fifo_count() > 0:
             time.sleep(0.5)
         del tiny
 
-        #tiny = TinyCN()
+        #tiny = techlf.TinyCN()
         #tiny.move_ramp_x(200)
         #tiny.move_ramp_x(0)
         #while tiny.get_fifo_count() > 0:
@@ -32,11 +31,11 @@ class TestTinyCN(unittest.TestCase):
 def test_suite( ):
     return unittest.TestSuite((
         unittest.TestLoader().loadTestsFromTestCase(TestTinyCN),
-        doctest.DocTestSuite(pycnic,
+        doctest.DocTestSuite(techlf,
                              optionflags=doctest.NORMALIZE_WHITESPACE+
                                          doctest.ELLIPSIS
                              ),
-        doctest.DocFileSuite('pycnic.txt',
+        doctest.DocFileSuite('techlf.txt',
                              optionflags=doctest.NORMALIZE_WHITESPACE+
                                          doctest.ELLIPSIS
                              ),

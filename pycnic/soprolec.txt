@@ -43,7 +43,7 @@ We can set the speed and move along the X axis using a ramp:
 50
 >>> icnc.x
 0
->>> icnc.move_x(20)
+>>> icnc.move(x=20)
 >>> icnc.x
 20
 
@@ -54,7 +54,7 @@ We can reset the current position to zero:
 0
 
 >>> icnc.speed = 30
->>> icnc.move_x(-20)
+>>> icnc.move(x=-20)
 >>> icnc.x
 -20
 

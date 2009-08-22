@@ -141,29 +141,39 @@ class InterpCNC(object):
     #
     # linear moves
     #
-    def move_x(self, step, ramp=True):
-        """Move X axis to specified step using a ramp or not
+    def move(self, x=None, y=None, z=None, a=None, ramp=True):
+        """Move specified axis to specified step using a ramp or not
 
         >>> cnc = InterpCNC(speed=440)
-        >>> cnc.move_x(10)
+        >>> cnc.move()
+        Traceback (most recent call last):
+        ...
+        ValueError: Please specify at least an axis to move
+        >>> cnc.move(x=10)
         >>> cnc.x
         10
-        >>> cnc.move_x(0, ramp=False)
+        >>> cnc.move(x=0, ramp=False)
         >>> cnc.x
         0
         """
-        if ramp: command = 'LX'
-        if not ramp: command = 'LLX'
-        self.execute(command + str(step))
+        if ramp: command = 'L'
+        if not ramp: command = 'LL'
+
+        if (x, y, z, a) == (None, None, None, None):
+            raise ValueError(u'Please specify at least an axis to move')
+
+        values = [('X',x), ('Y',y), ('Z',z), ('A',a)]
+        command += ''.join([val[0] + str(val[1]) for val in values if val[1] is not None])
+        self.execute(command)
 
     def _get_x(self):
         """Get the position of the X axis
 
         >>> cnc = InterpCNC(speed=440)
-        >>> cnc.move_x(10)
+        >>> cnc.move(x=10)
         >>> cnc._get_x()
         10
-        >>> cnc.move_x(0)
+        >>> cnc.move(x=0)
         >>> cnc._get_x()
         0
         """
@@ -226,7 +236,7 @@ class InterpCNC(object):
         >>> cnc.reset_all_axis()
         >>> cnc.x
         0
-        >>> cnc.move_x(5)
+        >>> cnc.move(x=5)
         >>> cnc.reset_all_axis()
         >>> cnc.x
         0

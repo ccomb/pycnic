@@ -1,4 +1,4 @@
-PyCNiC
+TechLF
 ======
 
 This library allows to control a TinyCN CNC controller from TechLF.
@@ -12,7 +12,7 @@ what I could not do with the TinyCN in several weeks.
 
 We can instantiate a TinyCN class, representing the controler:
 
->>> from pycnic.pycnic import TinyCN
+>>> from pycnic.techlf import TinyCN
 >>> tiny = TinyCN()
 >>> tiny.name
     'TinyCN'

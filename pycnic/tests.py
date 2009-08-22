@@ -1,6 +1,6 @@
 import time
 import unittest, doctest
-import techlf
+import techlf, soprolec
 import tests
 
 class TestTinyCN(unittest.TestCase):
@@ -21,13 +21,6 @@ class TestTinyCN(unittest.TestCase):
             time.sleep(0.5)
         del tiny
 
-        #tiny = techlf.TinyCN()
-        #tiny.move_ramp_x(200)
-        #tiny.move_ramp_x(0)
-        #while tiny.get_fifo_count() > 0:
-        #    time.sleep(0.5)
-        #del tiny
-
 def test_suite( ):
     return unittest.TestSuite((
         unittest.TestLoader().loadTestsFromTestCase(TestTinyCN),
@@ -35,7 +28,15 @@ def test_suite( ):
                              optionflags=doctest.NORMALIZE_WHITESPACE+
                                          doctest.ELLIPSIS
                              ),
+        doctest.DocTestSuite(soprolec,
+                             optionflags=doctest.NORMALIZE_WHITESPACE+
+                                         doctest.ELLIPSIS
+                             ),
         doctest.DocFileSuite('techlf.txt',
+                             optionflags=doctest.NORMALIZE_WHITESPACE+
+                                         doctest.ELLIPSIS
+                             ),
+        doctest.DocFileSuite('soprolec.txt',
                              optionflags=doctest.NORMALIZE_WHITESPACE+
                                          doctest.ELLIPSIS
                              ),

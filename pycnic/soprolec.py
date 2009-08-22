@@ -166,35 +166,47 @@ class InterpCNC(object):
         command += ''.join([val[0] + str(val[1]) for val in values if val[1] is not None])
         self.execute(command)
 
-    def _get_x(self):
+    def _get_axis(self, axis):
         """Get the position of the X axis
 
         >>> cnc = InterpCNC(speed=440)
         >>> cnc.move(x=10)
-        >>> cnc._get_x()
+        >>> cnc._get_axis('x')
         10
         >>> cnc.move(x=0)
-        >>> cnc._get_x()
+        >>> cnc._get_axis('x')
         0
         """
-        return int(self.execute('RX'))
+        if axis not in ('x', 'y', 'z', 'a'):
+            raise ValueError(u'Bad axis')
+        return int(self.execute('R' + axis.upper()))
 
-    def _set_x(self, x):
-        """Reset the X axis to the specified value without moving
+    def _set_axis(self, axis, value):
+        """Reset the specified axis to the specified value without moving
 
         >>> cnc = InterpCNC(speed=440)
         >>> cnc.x
         0
-        >>> cnc._set_x(10)
+        >>> cnc._set_axis('x', 10)
         >>> cnc.x
         10
-        >>> cnc._set_x(0)
+        >>> cnc._set_axis('x', 0)
         >>> cnc.x
         0
+        >>> cnc.y = 1
+        >>> cnc.z = 2
+        >>> cnc.a = 3
+        >>> cnc.x, cnc.y, cnc.z, cnc.a
+        (0, 1, 2, 3)
         """
-        self.execute('WX' + str(x))
+        if axis not in ('x', 'y', 'z', 'a'):
+            raise ValueError(u'Bad axis')
+        self.execute('W' + axis.upper() + str(value))
 
-    x = property(_get_x, _set_x)
+    x = property(lambda self: self._get_axis('x'), lambda self, val: self._set_axis('x', val))
+    y = property(lambda self: self._get_axis('y'), lambda self, val: self._set_axis('y', val))
+    z = property(lambda self: self._get_axis('z'), lambda self, val: self._set_axis('z', val))
+    a = property(lambda self: self._get_axis('a'), lambda self, val: self._set_axis('a', val))
 
     def _get_speed(self):
         """Get the current speed used for next move

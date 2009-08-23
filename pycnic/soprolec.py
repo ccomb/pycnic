@@ -149,7 +149,11 @@ class InterpCNC(object):
         """write a parameter into the EEPROM
         This should probably not be abused to save the EEPROM.
         """
-        return self.execute('WP' + param + 'V' + str(value))
+        try:
+            param = [p for p in self.paramlist if p['name']==param][0]
+        except:
+            raise ValueError(u'This config does not exist')
+        return self.execute('WP' + param['num'] + 'V' + str(value))
 
 
     #

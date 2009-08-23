@@ -26,11 +26,11 @@ class InterpCNC(object):
     _speed = None
     configfile = 'soprolec.csv'
 
-    def __init__(self, speed=500):
-        self.connect()
-        self.speed = speed
-        self.name = self.execute('RI')
-        self.reset_all_axis()
+    def __init__(self):
+        try:
+            self.connect()
+        except IOError:
+            logger.warning(u'Did you plug and turn on the device?')
         self.params = UserDict()
         self.params.__getitem__ = self._eeprom_read
         self.params.__setitem__ = self._eeprom_write
@@ -80,21 +80,24 @@ class InterpCNC(object):
         return self._paramlist
 
     def __repr__(self):
-        return '<%s.%s object at %s name="%s" speed=%s >' % (
+        return '<%s.%s object at %s name="%s">' % (
                 self.__module__,
                 self.__class__.__name__,
                 hex(id(self)),
-                self.name,
-                self.speed)
+                self.name)
 
     #
     # Lowlevel methods
     #
     def connect(self, serial_port=0):
-        if self.port is None or self.port.fd is None:
+        if (self.port is None
+            or self.port.fd is None
+            or not self.name):
             self.port = serial.Serial(serial_port,
                                       self.serial_speed,
                                       timeout=TIMEOUT)
+        self.name = self.execute('RI')
+        self.reset_all_axis()
 
     def disconnect(self):
         if self.port is None or self.port.fd is None:
@@ -109,20 +112,27 @@ class InterpCNC(object):
         while not response.endswith(self.prompt):
             time1 = time.time()
             response += self.port.read()
-            if time.time() - time1 > TIMEOUT: break
+            if time.time() - time1 > TIMEOUT:
+                raise IOError(u'Could not read from the device')
+                break
         return response
 
     def _write(self, command):
         """Write a command to the controller.
         """
+        time1 = time.time()
         self.port.write(command)
         self.port.flush()
+        if time.time() - time1 > TIMEOUT:
+            raise IOError(u'Could not write to the device')
 
     def execute(self, command):
         """execute a command by sending it to the controller,
         and returning its response.
         The result should be interpreted by the caller.
         """
+        if not self.name and command != 'RI':
+            raise IOError(u'The device is not connected')
         command += ';'
         logger.debug(u'Executing command: %s' % command)
         self._write(command)
@@ -322,7 +332,10 @@ class InterpCNC(object):
             raise ValueError(u'Bad axis')
         if value is None:
             # calibration with home sensor
-            self.execute('HX')
+            if 0 < int(self.params['EE_FDC_ORIGINEX']) <= 8:
+                self.execute('HX')
+            else:
+                raise Warning(u'The input port is not configured')
             return
         self.execute('W' + axis.upper() + str(value))
 

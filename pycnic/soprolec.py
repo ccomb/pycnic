@@ -15,6 +15,7 @@ class InterpCNC(object):
     """This class represents the InterpCNC controller
     """
     serial_speed = 19200
+    name = None
     prompt = '>'
     port = None
     _speed = None
@@ -22,7 +23,16 @@ class InterpCNC(object):
     def __init__(self, speed=500):
         self.connect()
         self.speed = speed
+        self.name = self.execute('RI')
         self.reset_all_axis()
+
+    def __repr__(self):
+        return '<%s.%s object at %s name="%s" speed=%s >' % (
+                self.__module__,
+                self.__class__.__name__,
+                hex(id(self)),
+                self.name,
+                self.speed)
 
     def __del__(self):
         self.disconnect
@@ -303,6 +313,7 @@ class InterpCNC(object):
         0
         """
         self.execute('E')
+
 
 
 

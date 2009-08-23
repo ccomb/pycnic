@@ -67,11 +67,11 @@ class InterpCNC(object):
             if not titles:
                 titles = line.split(';')
                 continue
+            if line.strip() == '':
+                break
             # turn following lines into a dict with titles
             param = dict(zip(titles, line.split(';')))
             self._paramlist.append(param)
-            if line.strip() == '':
-                break
 
         if not found:
             raise NotImplementedError(
@@ -136,12 +136,14 @@ class InterpCNC(object):
         """Read a parameter in the EEPROM
 
         >>> cnc = InterpCNC()
-        >>> 0 < cnc.params['EE_DEFAULT_SPEED'] < 10000
+        >>> 0 < int(cnc.params['EE_DEFAULT_SPEED']) < 10000
         True
         """
-        if param not in [p['name'] for p in self.paramlist]:
+        try:
+            param = [p for p in self.paramlist if p['name']==param][0]
+        except:
             raise ValueError(u'This config does not exist')
-        return self.execute('RP'+ param)
+        return self.execute('RP'+ param['num'])
 
     def _eeprom_write(self, param, value):
         """write a parameter into the EEPROM

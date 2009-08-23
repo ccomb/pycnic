@@ -144,7 +144,7 @@ class InterpCNC(object):
     #
     # linear moves
     #
-    def move(self, x=None, y=None, z=None, ramp=True):
+    def move(self, x=None, y=None, z=None, speed=None, ramp=True):
         """Move specified axis to specified step using a ramp or not
 
         >>> cnc = InterpCNC(speed=440)
@@ -165,21 +165,22 @@ class InterpCNC(object):
         >>> cnc.x, cnc.y, cnc.z
         (0, 0, 0)
 
-        >>> cnc.move(y=10)
-        >>> cnc.x, cnc.y, cnc.z
-        (0, 10, 0)
-        >>> cnc.move(y=0, ramp=False)
-        >>> cnc.x, cnc.y, cnc.z
-        (0, 0, 0)
+        We can specify the speed of the move
 
+        >>> cnc.move(x=200, speed=500)
+        >>> cnc.move(x=0, speed=2000)
+
+        >>> cnc.move(y=10)
         >>> cnc.move(z=10)
         >>> cnc.x, cnc.y, cnc.z
-        (0, 0, 10)
-        >>> cnc.move(z=0, ramp=False)
+        (0, 10, 10)
+        >>> cnc.move(y=0)
+        >>> cnc.move(z=0)
         >>> cnc.x, cnc.y, cnc.z
         (0, 0, 0)
 
-        We can move to any point using all axis in one move:
+        We can also move along all axis at once:
+
         >>> cnc.x, cnc.y, cnc.z
         (0, 0, 0)
         >>> cnc.move(x=10, y=20, z=30)
@@ -201,6 +202,11 @@ class InterpCNC(object):
         # the card wants the biggest move to be at the left.
         values.sort(key=lambda x:x[1], reverse=True)
         command += ''.join([val[0] + str(val[1]) for val in values if val[1] is not None])
+
+        # add the speed
+        if speed is not None:
+            command += 'V' + str(speed)
+
         self.execute(command)
 
     def _get_axis(self, axis):

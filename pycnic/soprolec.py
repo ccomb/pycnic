@@ -87,11 +87,6 @@ class InterpCNC(object):
                 self.name,
                 self.speed)
 
-    # makes the testrunner unhappy
-    #def __del__(self):
-    #    self.disconnect()
-
-
     #
     # Lowlevel methods
     #

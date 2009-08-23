@@ -2,9 +2,12 @@
 """Module supporting Soprolec controllers
 See soprolec.txt
 """
+from UserDict import UserDict
+import logging
+import os
+import pycnic
 import serial
 import time
-import logging
 
 TIMEOUT = 1 # in seconds, for serial port reads or writes
 logger = logging.getLogger('PyCNiC')
@@ -17,14 +20,64 @@ class InterpCNC(object):
     serial_speed = 19200
     name = None
     prompt = '>'
+    _paramlist = None
+    params = None
     port = None
     _speed = None
+    configfile = 'soprolec.csv'
 
     def __init__(self, speed=500):
         self.connect()
         self.speed = speed
         self.name = self.execute('RI')
         self.reset_all_axis()
+        self.params = UserDict()
+        self.params.__getitem__ = self._eeprom_read
+        self.params.__setitem__ = self._eeprom_write
+
+    @property
+    def paramlist(self):
+        """Load the parameter descriptions from a csv file
+
+        >>> InterpCNC().paramlist[0]['name']
+        'EE_DEFAULT_SPEED'
+        >>> InterpCNC().paramlist[0]['num']
+        '3'
+
+        """
+        if self._paramlist is not None:
+            return self._paramlist
+        # read the file
+        paramfile = open(os.path.join(os.path.dirname(pycnic.__file__),
+                                         self.configfile))
+        paramlist = paramfile.readlines()
+        paramfile.close()
+        # get only our own config based on the card identifier
+        found = False
+        titles = None
+        for line in paramlist:
+            line = line.strip()
+            # try to find our name
+            if not found and line == self.name:
+                found = True
+                self._paramlist = []
+                continue
+            if not found: continue
+            # next line is the title line
+            if not titles:
+                titles = line.split(';')
+                continue
+            # turn following lines into a dict with titles
+            param = dict(zip(titles, line.split(';')))
+            self._paramlist.append(param)
+            if line.strip() == '':
+                break
+
+        if not found:
+            raise NotImplementedError(
+                u'No config yet for this card. Please contact the author.')
+
+        return self._paramlist
 
     def __repr__(self):
         return '<%s.%s object at %s name="%s" speed=%s >' % (
@@ -35,7 +88,7 @@ class InterpCNC(object):
                 self.speed)
 
     def __del__(self):
-        self.disconnect
+        self.disconnect()
 
     #
     # Lowlevel methods
@@ -84,7 +137,13 @@ class InterpCNC(object):
 
     def _eeprom_read(self, param):
         """Read a parameter in the EEPROM
+
+        >>> cnc = InterpCNC()
+        >>> 0 < cnc.params['EE_DEFAULT_SPEED'] < 10000
+        True
         """
+        if param not in [p['name'] for p in self.paramlist]:
+            raise ValueError(u'This config does not exist')
         return self.execute('RP'+ param)
 
     def _eeprom_write(self, param, value):
@@ -92,6 +151,7 @@ class InterpCNC(object):
         This should probably not be abused to save the EEPROM.
         """
         return self.execute('WP' + param + 'V' + str(value))
+
 
     #
     # Informative commands

@@ -1,0 +1,16 @@
+# CSV file for the parameters definition of Soprolec cards.
+# Syntax:
+# First line = card identifier
+# second line = column titles
+# Then, one line per parameter
+# Different controllers must be separated by an empty line
+
+InterpCNC V3.16
+num;name;unit;function;remark
+3;EE_DEFAULT_SPEED;Hz;Default speed for linear and circular moves;Used by the card until a speed is provided with a V or L command
+4;EE_DEFAULT_ACCEL;kHz/s;Default acceleration for linear and circular moves;
+5;EE_DEFAULT_STARTF;Hz;default start frequency for linear and circular moves;
+6;EE_XSENS;;Rotation direction of axis X;0 or 1
+7;EE_YSENS;;Rotation direction of axis Y;0 or 1
+8;EE_ZSENS;;Rotation direction of axis Z;0 or 1
+

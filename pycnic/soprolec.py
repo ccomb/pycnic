@@ -26,7 +26,8 @@ class InterpCNC(object):
     _speed = None
     configfile = 'soprolec.csv'
 
-    def __init__(self):
+    def __init__(self, speed=1000):
+        self._speed = speed
         try:
             self.connect()
         except IOError:
@@ -97,6 +98,7 @@ class InterpCNC(object):
                                       self.serial_speed,
                                       timeout=TIMEOUT)
         self.name = self.execute('RI')
+        self.speed = self._speed
         self.reset_all_axis()
 
     def disconnect(self):
@@ -105,16 +107,20 @@ class InterpCNC(object):
         self.port.flush()
         self.port.close()
 
-    def _read(self):
+    def _read(self, timeout=None):
         """Read from the controller until we get the prompt or we timeout.
         """
+        if timeout is None:
+            timeout = TIMEOUT
+
         response = ''
         while not response.endswith(self.prompt):
             time1 = time.time()
             response += self.port.read()
-            if time.time() - time1 > TIMEOUT:
+            if time.time() - time1 > 0.9 * timeout:
                 raise IOError(u'Could not read from the device')
                 break
+
         return response
 
     def _write(self, command):
@@ -131,12 +137,15 @@ class InterpCNC(object):
         and returning its response.
         The result should be interpreted by the caller.
         """
+        timeout = None
         if not self.name and command != 'RI':
             raise IOError(u'The device is not connected')
+        if command.startswith('H'):
+            timeout = 10 # the card does not respond while calibrating
         command += ';'
         logger.debug(u'Executing command: %s' % command)
         self._write(command)
-        response = self._read()
+        response = self._read(timeout=timeout)
         if response.startswith('=') and response.endswith(self.prompt):
             return response[1:-1]
         else:

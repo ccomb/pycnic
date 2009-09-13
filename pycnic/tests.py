@@ -21,21 +21,29 @@ class TestTinyCN(unittest.TestCase):
             time.sleep(0.5)
         del tiny
 
+
+class TestSoprolec(unittest.TestCase):
+    def test_get_x_after_creation(self):
+        s = soprolec.InterpCNC()
+        self.assertTrue(s.x == 0)
+
+
 def test_suite( ):
     return unittest.TestSuite((
-        unittest.TestLoader().loadTestsFromTestCase(TestTinyCN),
-        doctest.DocTestSuite(techlf,
-                             optionflags=doctest.NORMALIZE_WHITESPACE+
-                                         doctest.ELLIPSIS
-                             ),
+#        unittest.TestLoader().loadTestsFromTestCase(TestTinyCN),
+        unittest.TestLoader().loadTestsFromTestCase(TestSoprolec),
+#        doctest.DocTestSuite(techlf,
+#                             optionflags=doctest.NORMALIZE_WHITESPACE+
+#                                         doctest.ELLIPSIS
+#                             ),
         doctest.DocTestSuite(soprolec,
                              optionflags=doctest.NORMALIZE_WHITESPACE+
                                          doctest.ELLIPSIS
                              ),
-        doctest.DocFileSuite('techlf.txt',
-                             optionflags=doctest.NORMALIZE_WHITESPACE+
-                                         doctest.ELLIPSIS
-                             ),
+#        doctest.DocFileSuite('techlf.txt',
+#                             optionflags=doctest.NORMALIZE_WHITESPACE+
+#                                         doctest.ELLIPSIS
+#                             ),
         doctest.DocFileSuite('soprolec.txt',
                              optionflags=doctest.NORMALIZE_WHITESPACE+
                                          doctest.ELLIPSIS

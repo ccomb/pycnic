@@ -10,6 +10,7 @@ import serial
 import time
 
 TIMEOUT = 1 # in seconds, for serial port reads or writes
+MAXTIMEOUT = 30 # in seconds, for any move command
 logger = logging.getLogger('PyCNiC')
 logging.basicConfig(level=logging.INFO)
 
@@ -107,6 +108,7 @@ class InterpCNC(object):
         self.port.flush()
         self.port.close()
 
+
     def _read(self, timeout=None):
         """Read from the controller until we get the prompt or we timeout.
         """
@@ -132,12 +134,11 @@ class InterpCNC(object):
         if time.time() - time1 > TIMEOUT:
             raise IOError(u'Could not write to the device')
 
-    def execute(self, command):
+    def execute(self, command, timeout=None):
         """execute a command by sending it to the controller,
         and returning its response.
         The result should be interpreted by the caller.
         """
-        timeout = None
         if not self.name and command != 'RI':
             raise IOError(u'The device is not connected')
         if command.startswith('H'):
@@ -300,6 +301,16 @@ class InterpCNC(object):
             command += 'V' + str(speed)
 
         self.execute(command)
+
+    def wait(self, time=None):
+        """tell the controller to wait during <time> seconds. If time is not provided, wait until the
+        controller is available.
+        """
+        if time is None:
+            self.execute('RX', timeout=MAXTIMEOUT)
+        if time > 0:
+            self.execute('WD' + str(10*time), timeout=MAXTIMEOUT)
+
 
     def _get_axis(self, axis):
         """Get the position of the X axis

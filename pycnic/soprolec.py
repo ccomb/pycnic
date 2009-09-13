@@ -11,7 +11,7 @@ import time
 
 TIMEOUT = 1 # in seconds, for serial port reads or writes
 logger = logging.getLogger('PyCNiC')
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
 
 class InterpCNC(object):

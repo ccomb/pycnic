@@ -7,12 +7,28 @@ import logging
 import os
 import pycnic
 import serial
+import usb
 import time
+
+logger = logging.getLogger('PyCNiC')
+logging.basicConfig(level=logging.INFO)
 
 TIMEOUT = 1 # in seconds, for serial port reads or writes
 MAXTIMEOUT = 30 # in seconds, for any move command
-logger = logging.getLogger('PyCNiC')
-logging.basicConfig(level=logging.INFO)
+VENDOR_ID = 0x067b
+PRODUCT_ID = 0x2303
+PRODUCT_NAME = u'serial to usb converter'
+
+def tuple2hex(tup):
+    """Converts a data tuple of integers to its hex representation
+
+    >>> from pycnic import tuple2hex
+    >>> tuple2hex( (1,2,3) )
+    '01 02 03'
+    >>> tuple2hex( (30,40,110) )
+    '1E 28 6E'
+    """
+    return ' '.join(["%02X" % i for i in tup])
 
 
 class InterpCNC(object):
@@ -23,7 +39,9 @@ class InterpCNC(object):
     prompt = '>'
     _paramlist = None
     params = None
-    port = None
+    port = None # serial
+    handle = None # usb
+    device = None # usb
     _speed = None
     configfile = 'soprolec.csv'
 
@@ -92,33 +110,81 @@ class InterpCNC(object):
     # Lowlevel methods
     #
     def connect(self, serial_port=0):
+        # first try the serial port
         if (self.port is None
             or self.port.fd is None
             or not self.name):
             self.port = serial.Serial(serial_port,
                                       self.serial_speed,
                                       timeout=TIMEOUT)
-        self.name = self.execute('RI')
-        self.speed = self._speed
-        self.reset_all_axis()
+        if self.port.fd is not None:
+            self.name = self.execute('RI')
+            self.speed = self._speed
+            self.reset_all_axis()
+            return
+        else:
+            self.port = None
+        # otherwise try the usb port
+            busses = usb.busses()
+            # try to find the device
+            self.device = None
+            for bus in busses:
+                for device in bus.devices:
+                    if device.idVendor == VENDOR_ID \
+                      and device.idProduct == PRODUCT_ID:
+                        logger.info(u"found %s!", PRODUCT_NAME)
+                        self.device = device
+                        break
+
+            if self.device is None:
+                raise IOError(u'No device found')
+
+            logger.debug(u'Opening device...')
+            self.handle = self.device.open()
+
+            logger.debug(u'Detach kernel driver...')
+            interface = self.device.configurations[0].interfaces[0][0]
+            self.handle.detachKernelDriver(interface)
+
+            logger.debug(u'Setting configuration 1')
+            self.handle.setConfiguration(1)
+
+            logger.debug(u'Claiming interface 0')
+            self.handle.claimInterface(0)
+
+
+
+
 
     def disconnect(self):
-        if self.port is None or self.port.fd is None:
-            return
-        self.port.flush()
-        self.port.close()
+        # serial
+        if self.port is not None and self.port.fd is not None:
+            self.port.flush()
+            self.port.close()
 
+        # usb
+        if self.handle is not None:
+            logger.debug(u'Releasing interface...')
+            self.handle.releaseInterface()
+            self.handle = None
+            #self.device.close()
 
     def _read(self, timeout=None):
         """Read from the controller until we get the prompt or we timeout.
         """
+        logger.debug(u'    Now we read the result...')
         if timeout is None:
             timeout = TIMEOUT
 
         response = ''
         while not response.endswith(self.prompt):
             time1 = time.time()
-            response += self.port.read()
+            if self.port is not None: # serial
+                response += self.port.read()
+            elif self.handle is not None: # usb
+                size = 1
+                buffer = self.handle.bulkRead(0x83, size, TIMEOUT)
+                response += buffer
             if time.time() - time1 > 0.9 * timeout:
                 raise IOError(u'Could not read from the device')
                 break
@@ -128,9 +194,16 @@ class InterpCNC(object):
     def _write(self, command):
         """Write a command to the controller.
         """
+        logger.debug(u'    we write the command %s...' % command)
         time1 = time.time()
-        self.port.write(command)
-        self.port.flush()
+
+        if self.port is not None: # serial
+            self.port.write(command)
+            self.port.flush()
+        elif self.handle is not None: # usb
+            bytes = self.handle.bulkWrite(0x02, command, TIMEOUT)
+            logger.debug(u'    %s bytes written' % bytes)
+
         if time.time() - time1 > TIMEOUT:
             raise IOError(u'Could not write to the device')
 

@@ -313,7 +313,7 @@ class InterpCNC(object):
     def move(self, x=None, y=None, z=None, speed=None, ramp=True):
         """Move specified axis to specified step using a ramp or not
 
-        >>> cnc = InterpCNC(speed=440)
+        >>> cnc = InterpCNC(speed=2000)
 
         We must specify one axis
 
@@ -388,7 +388,7 @@ class InterpCNC(object):
     def _get_axis(self, axis):
         """Get the position of the X axis
 
-        >>> cnc = InterpCNC(speed=440)
+        >>> cnc = InterpCNC(speed=2000)
         >>> cnc.move(x=10)
         >>> cnc._get_axis('x')
         10
@@ -403,7 +403,7 @@ class InterpCNC(object):
     def _set_axis(self, axis, value):
         """Reset the specified axis to the specified value without moving
 
-        >>> cnc = InterpCNC(speed=440)
+        >>> cnc = InterpCNC(speed=2000)
         >>> cnc.x
         0
         >>> cnc._set_axis('x', 10)
@@ -418,7 +418,7 @@ class InterpCNC(object):
         (0, 1, 2)
 
         If value is None, perform a calibration on the specified axis
-        >>> cnc.x = None
+        #>>> cnc.x = None
 
         """
         if axis not in ('x', 'y', 'z'):

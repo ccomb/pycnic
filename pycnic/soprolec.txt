@@ -38,9 +38,9 @@ We can read parameters using a higher level API:
 We can set the speed and move along an axis using a ramp:
 
 >>> icnc.connect()
->>> icnc.speed = 50
+>>> icnc.speed = 500
 >>> icnc.speed
-50
+500
 >>> icnc.x
 0
 >>> icnc.move(x=20)
@@ -53,7 +53,7 @@ We can reset the current position to zero:
 >>> icnc.x
 0
 
->>> icnc.speed = 30
+>>> icnc.speed = 300
 >>> icnc.move(x=-20)
 >>> icnc.x
 -20

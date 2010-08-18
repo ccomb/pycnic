@@ -5,6 +5,33 @@
 # Then, one line per parameter
 # Different controllers must be separated by an empty line
 
+InterpCNC V3.15
+num;name;unit;function;remark
+3;EE_DEFAULT_SPEED;Hz;Default speed for linear and circular moves;Used by the card until a speed is provided with a V or L command
+4;EE_DEFAULT_ACCEL;kHz/s;Default acceleration for linear and circular moves;
+5;EE_DEFAULT_STARTF;Hz;default start frequency for linear and circular moves;
+6;EE_XSENS;;Rotation direction of axis X;0 or 1
+7;EE_YSENS;;Rotation direction of axis Y;0 or 1
+8;EE_ZSENS;;Rotation direction of axis Z;0 or 1
+9;EE_ORIGINE_XSENS;;X axis direction for searching sensor during zero calibration;0 or 1. Also depends on the config #6
+10;EE_ORIGINE_YSENS;;Y axis direction for searching sensor during zero calibration;0 or 1. Also depends on the config #7
+11;EE_ORIGINE_ZSENS;;Z axis direction for searching sensor during zero calibration;0 or 1. Also depends on the config #8
+38;EE_ORIGINE_ASENS;;A axis direction for searching sensor during zero calibration;0 or 1. Also depends on the config #37
+29;EE_FDC_ORIGINEX;;Sensor input number for X axis zero calibration;disabled if 0
+30;EE_FDC_ORIGINEY;;Sensor input number for Y axis zero calibration;disabled if 0
+31;EE_FDC_ORIGINEZ;;Sensor input number for Z axis zero calibration;disabled if 0
+41;EE_FDC_ORIGINEA;;Sensor input number for A axis zero calibration;disabled if 0
+34;EE_MAX_COURSE_X;steps;Maximum move on axis X for a T, P, or H command;
+35;EE_MAX_COURSE_Y;steps;Maximum move on axis Y for a T, P, or H command;
+36;EE_MAX_COURSE_Z;steps;Maximum move on axis Z for a T, P, or H command;
+42;EE_MAX_COURSE_A;steps;Maximum move on axis A for a T, P, or H command;
+12;EE_ORIGINE_SPEED_RAPIDE;Hz;Default speed when moving to the sensor during zero calibration;
+13;EE_ORIGINE_ACCEL_RAPIDE;kHz/s;Default acceleration when moving to the sensor
+during zero calibration;
+14;EE_ORIGINE_STARTF_RAPIDE;Hz;Default start frequency when moving to the sensor during zero calibration.;
+15;EE_ORIGINE_SPEED_LENTE;Hz;Frequency used during the second step of the zero
+calibration, when leaving the sensor.;
+
 InterpCNC V3.16
 num;name;unit;function;remark
 3;EE_DEFAULT_SPEED;Hz;Default speed for linear and circular moves;Used by the card until a speed is provided with a V or L command

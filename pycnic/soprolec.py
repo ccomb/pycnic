@@ -22,7 +22,7 @@ PRODUCT_NAME = u'serial to usb converter'
 def tuple2hex(tup):
     """Converts a data tuple of integers to its hex representation
 
-    >>> from pycnic import tuple2hex
+    >>> from pycnic.soprolec import tuple2hex
     >>> tuple2hex( (1,2,3) )
     '01 02 03'
     >>> tuple2hex( (30,40,110) )

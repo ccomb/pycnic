@@ -69,7 +69,15 @@ When finished, we can disconnect from the controller:
 For more information, please read the API
 
 
-
+# to read all the params
+#for i in range(65):
+#    ser.write('RP'+str(i)+';')
+#    ser.flush()
+#    result=r=''
+#    while r!='>':
+#        r = ser.read()
+#        result += r
+#    print 'param ' + str(i) + ' = ' + result
 
 
 

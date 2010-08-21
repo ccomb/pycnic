@@ -120,7 +120,7 @@ class InterpCNC(object):
         if self.port.fd is not None:
             self.name = self.execute('RI')
             self.speed = self._speed
-            self.reset_all_axis()
+            #self.reset_all_axis()
             return
         else:
             self.port = None

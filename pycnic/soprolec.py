@@ -13,7 +13,7 @@ import time
 logger = logging.getLogger('PyCNiC')
 logging.basicConfig(level=logging.INFO)
 
-TIMEOUT = 1 # in seconds, for serial port reads or writes
+TIMEOUT = 2 # in seconds, for serial port reads or writes
 MAXTIMEOUT = 30 # in seconds, for any move command
 VENDOR_ID = 0x067b
 PRODUCT_ID = 0x2303
@@ -314,6 +314,7 @@ class InterpCNC(object):
         """Move specified axis to specified step using a ramp or not
 
         >>> cnc = InterpCNC(speed=2000)
+        >>> cnc.reset_all_axis()
 
         We must specify one axis
 
@@ -330,6 +331,13 @@ class InterpCNC(object):
         >>> cnc.move(x=0, ramp=False)
         >>> cnc.x, cnc.y, cnc.z
         (0, 0, 0)
+
+        int are converted to floats
+
+        >>> cnc.move(x=10.2)
+        >>> cnc.x, cnc.y, cnc.z
+        (10, 0, 0)
+
 
         We can specify the speed of the move
 
@@ -367,7 +375,7 @@ class InterpCNC(object):
         values = [('X',x), ('Y',y), ('Z',z)]
         # the card wants the biggest move to be at the left.
         values.sort(key=lambda x:x[1], reverse=True)
-        command += ''.join([val[0] + str(val[1]) for val in values if val[1] is not None])
+        command += ''.join([val[0] + str(int(val[1])) for val in values if val[1] is not None])
 
         # add the speed
         if speed is not None:
@@ -389,6 +397,7 @@ class InterpCNC(object):
         """Get the position of the X axis
 
         >>> cnc = InterpCNC(speed=2000)
+        >>> cnc.reset_all_axis()
         >>> cnc.move(x=10)
         >>> cnc._get_axis('x')
         10
@@ -404,6 +413,7 @@ class InterpCNC(object):
         """Reset the specified axis to the specified value without moving
 
         >>> cnc = InterpCNC(speed=2000)
+        >>> cnc.reset_all_axis()
         >>> cnc.x
         0
         >>> cnc._set_axis('x', 10)

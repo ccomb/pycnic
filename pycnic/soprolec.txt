@@ -1,0 +1,83 @@
+Soprolec
+========
+
+This library allows to control an InterpCNC controller from Soprolec.
+
+Basic usage
+-----------
+
+We can instantiate an InterpCNC class, representing the controller:
+
+>>> from pycnic.soprolec import InterpCNC
+>>> icnc = InterpCNC()
+
+the port is already open, opening it again does nothing:
+
+>>> oldport = icnc.port
+>>> icnc.connect()
+>>> oldport is icnc.port
+True
+
+We can disconnect and reconnect:
+
+>>> icnc.disconnect()
+>>> icnc.connect()
+>>> oldport is icnc.port
+False
+
+We can immediately execute a command on the controller, and get the response:
+
+>>> icnc.execute('RX')
+'0'
+
+We can read parameters using a higher level API:
+
+>>> icnc.firmware_major
+3
+
+We can set the speed and move along an axis using a ramp:
+
+>>> icnc.connect()
+>>> icnc.speed = 500
+>>> icnc.speed
+500
+>>> icnc.x
+0
+>>> icnc.move(x=20)
+>>> icnc.x
+20
+
+We can reset the current position to zero:
+
+>>> icnc.x = 0
+>>> icnc.x
+0
+
+>>> icnc.speed = 300
+>>> icnc.move(x=-20)
+>>> icnc.x
+-20
+
+>>> icnc.reset_all_axis()
+>>> icnc.x
+0
+
+When finished, we can disconnect from the controller:
+
+>>> icnc.disconnect()
+
+For more information, please read the API
+
+
+# to read all the params
+#for i in range(65):
+#    ser.write('RP'+str(i)+';')
+#    ser.flush()
+#    result=r=''
+#    while r!='>':
+#        r = ser.read()
+#        result += r
+#    print 'param ' + str(i) + ' = ' + result
+
+
+

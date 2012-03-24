@@ -1,4 +1,7 @@
 # coding: utf-8
+"""Module supporting the TechLF controllers
+See techlf.txt
+"""
 import ctypes
 import pdb
 import logging
@@ -19,7 +22,6 @@ PRODUCT_NAME = u'TinyCN'
 def byte2hex(byteStr):
     """Converts a byte string to its hex representation
 
-    >>> from pycnic import byte2hex
     >>> byte2hex('\xFF\xFF')
     'FF FF'
     >>> byte2hex('\xAA\xAA\xAA')
@@ -36,7 +38,6 @@ def byte2hex(byteStr):
 def byte2int(byteStr):
     """Converts a little endian (ie reversed) byte string to the corresponding integer
 
-    >>> from pycnic import byte2int
     >>> byte2int('\xFF\xFF')
     65535
     >>> byte2int('\x40\x01')
@@ -53,7 +54,6 @@ def byte2int(byteStr):
 def int2byte(integer):
     """Converts an integer to its corresponding little endian (ie reversed) 4-byte string
 
-    >>> from pycnic import int2byte
     >>> print int2byte(0x00)
     \x00\x00\x00\x00
     >>> print int2byte(0x01)
@@ -71,7 +71,6 @@ def int2byte(integer):
 def int2tuple(integer):
     """Converts an integer to its corresponding little endian (ie reversed) 4-byte tuple
 
-    >>> from pycnic import int2tuple
     >>> print int2tuple(0x00)
     (0, 0, 0, 0)
     >>> print int2tuple(0x01)
@@ -90,7 +89,6 @@ def int2tuple(integer):
 def tuple2hex(tup):
     """Converts a data tuple of integers to its hex representation
 
-    >>> from pycnic import tuple2hex
     >>> tuple2hex( (1,2,3) )
     '01 02 03'
     >>> tuple2hex( (30,40,110) )
@@ -101,7 +99,6 @@ def tuple2hex(tup):
 def tuple2str(tup):
     """Converts a data tuple of integers to its string representation
 
-    >>> from pycnic import tuple2str
     >>> tuple2str( (84, 105, 110, 121, 67, 78) )
     'TinyCN'
     """
@@ -110,7 +107,6 @@ def tuple2str(tup):
 def tuple2int(tup):
     """Converts a tuple of int to the equivalent int
 
-    >>> from pycnic import tuple2int
     >>> tuple2int( (12, 01, 01) )
     65804
     >>> tuple2int( (01, 00) )

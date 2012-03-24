@@ -1,0 +1,21 @@
+TechLF
+======
+
+This library allows to control a TinyCN CNC controller from TechLF.
+
+Development on this library has been stopped because the TechLF controllers are not
+documented. Unless some documentation appears, you should consider trying a Soprolec
+controller instead, because it is better documented: I could achieve in one day
+what I could not do with the TinyCN in several weeks.
+Update : however the main drawback of the Soprolec is that the firmware is not published and contains some hidden features. The next step is to move this library to using an open Arduino based firmware...
+
+We can instantiate a TinyCN class, representing the controler:
+
+>>> from pycnic.techlf import TinyCN
+>>> tiny = TinyCN()
+>>> tiny.name
+    'TinyCN'
+
+We can turn off
+
+>>> tiny.off()

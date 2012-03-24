@@ -4,3 +4,4 @@
 ^develop-eggs/.*
 ^.installed.cfg$
 curve.ntc$
+.*\.swp$

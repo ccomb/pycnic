@@ -20,6 +20,7 @@ setup(name='pycnic',
       install_requires=[
           # -*- Extra requirements: -*-
           'pyusb',
+          'pyserial',
       ],
       entry_points="""
       # -*- Entry points: -*-

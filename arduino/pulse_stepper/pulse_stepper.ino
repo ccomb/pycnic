@@ -61,6 +61,9 @@ void check_messages() {
   if (Serial.available()) {
     curval = Serial.read();
     boolean ramp = false;
+    if (curval == 'E') {
+      x = 0;
+    }
     if (curval == 'R') {
       while (!Serial.available()) {};
       curval = Serial.read();
@@ -79,6 +82,20 @@ void check_messages() {
         if (curval == 'L') {   
           Serial.println(String("1"));
         }
+      }
+    }
+    if (curval == 'V') {
+      while (!Serial.available()) {};
+      curval = Serial.read();
+      if (curval == 'V') {
+        speed = Serial.parseInt();
+      }
+    }
+    if (curval == 'W') {
+      while (!Serial.available()) {};
+      curval = Serial.read();
+      if (curval == 'X') {
+        x = Serial.parseInt();
       }
     }
     if (curval == 'L') {

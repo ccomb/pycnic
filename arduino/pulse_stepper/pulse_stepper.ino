@@ -16,7 +16,6 @@ int go = 1;
 int rampsteps = 200;
 int curspeed = 0;
 
-
 void moveTo(int target, boolean ramp) {
 
   if (target == x) return;
@@ -28,10 +27,10 @@ void moveTo(int target, boolean ramp) {
     digitalWrite(X_DIRECTION, LOW);
   }
   int cur = 0;
-  for (int i=x; i!=target; i+=direction) {
+  for (int i=x; i!=target+direction; i+=direction) {
     curspeed = speed;
-    if (ramp && (cur < rampsteps)) {
-      curspeed = (cur / (float) rampsteps) * speed;
+    if (ramp && (cur <= rampsteps)) {
+      curspeed = (speed / (float) rampsteps) * cur;
     }
     //digitalWrite(X_PULSE, HIGH);
     X_PULSE_PORT |= X_PULSE_BIT;
@@ -62,6 +61,26 @@ void check_messages() {
   if (Serial.available()) {
     curval = Serial.read();
     boolean ramp = false;
+    if (curval == 'R') {
+      while (!Serial.available()) {};
+      curval = Serial.read();
+      if (curval == 'X') {
+        Serial.println(x);
+      }
+      if (curval == 'I') {
+        Serial.println(String("arduino"));
+      }
+      if (curval == 'V') {
+        while (!Serial.available()) {};
+        curval = Serial.read();
+        if (curval == 'H') {   
+          Serial.println(String("0"));
+        }
+        if (curval == 'L') {   
+          Serial.println(String("1"));
+        }
+      }
+    }
     if (curval == 'L') {
       while (!Serial.available()) {};
       curval = Serial.read();

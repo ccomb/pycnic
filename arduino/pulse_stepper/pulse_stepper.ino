@@ -1,17 +1,23 @@
 
 // set arduino pins
 #define X_PULSE 4
+#define X_PULSE_PORT PORTD
 #define X_DIRECTION 8
 #define X_ENABLE 6
 #define X_SWITCH 5
 
+#define X_PULSE_BIT (1<<4)
 
 long x = 0; // current step position
-int speed = 3000;   // default speed (steps/s) max = 32750
+int speed = 8000;   // default speed (steps/s) max = 32750
 int direction = 1;
 int go = 1;
 
-void moveTo(int target) {
+int rampsteps = 200;
+int curspeed = 0;
+
+
+void moveTo(int target, boolean ramp) {
 
   if (target == x) return;
   if (target > x) {
@@ -21,13 +27,20 @@ void moveTo(int target) {
     direction = -1;
     digitalWrite(X_DIRECTION, LOW);
   }
-  
+  int cur = 0;
   for (int i=x; i!=target; i+=direction) {
-    digitalWrite(X_PULSE, HIGH);
-    delayMicroseconds(1000000/speed/2);
-    digitalWrite(X_PULSE, LOW);
-    delayMicroseconds(1000000/speed/2);
+    curspeed = speed;
+    if (ramp && (cur < rampsteps)) {
+      curspeed = (cur / (float) rampsteps) * speed;
+    }
+    //digitalWrite(X_PULSE, HIGH);
+    X_PULSE_PORT |= X_PULSE_BIT;
+    delayMicroseconds(1000000/curspeed/2);
+    //digitalWrite(X_PULSE, LOW);
+    X_PULSE_PORT &=~ X_PULSE_BIT;
+    delayMicroseconds(1000000/curspeed/2);
     x = i;
+    cur ++;
   }
 }
 
@@ -43,11 +56,45 @@ void setup() {
   //digitalWrite(X_ENABLE, HIGH);
 }
 
-void loop() {
+char curval;
 
+void check_messages() {
+  if (Serial.available()) {
+    curval = Serial.read();
+    boolean ramp = false;
+    if (curval == 'L') {
+      while (!Serial.available()) {};
+      curval = Serial.read();
+      if (curval == 'L')
+      {
+        ramp = true;
+        while (!Serial.available()) {};
+        curval = Serial.read();
+      }
+      
+      if (curval == 'X') {
+        /*String value = String("");
+        for (int i = 0; i < 5; i ++) {
+          while (!Serial.available()) {};
+          value += (char) Serial.read();
+        }
+        int xval = value.toInt();*/
+        int xval = Serial.parseInt();
+        moveTo(xval, ramp);
+      }
+    }
+  }
+  
+  
+}
+
+void loop() {
+  
+  check_messages();
+  /*
   go = digitalRead(X_SWITCH);
   Serial.println(go);
-  if (go == HIGH) {
+  //if (go == HIGH) {
     Serial.println("move 1600");
     moveTo(1600);
     Serial.println("sleep");
@@ -63,6 +110,6 @@ void loop() {
     Serial.println("move 0");
     moveTo(0);
     delay(500);
-  }
+  //}*/
   delay(50);
 }
